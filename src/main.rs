@@ -1,4 +1,7 @@
+use std::env;
+
 use hilo::app;
+use sqlx::PgPool;
 use tokio::net::TcpListener;
 // use tracing::info;
 // use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -15,7 +18,12 @@ async fn main() {
 
     dotenvy::dotenv().ok();
 
-    let app = app();
+    let db_pool = PgPool::connect(
+        &env::var("DATABASE_URL").expect("Env variable `DATABASE_URL` should be set"),
+    )
+    .await
+    .expect("Failed to connect to Postgres");
+    let app = app(db_pool);
     // info!("Server starting at http://{}", addr);
 
     let listener = TcpListener::bind("0.0.0.0:8090").await.unwrap();

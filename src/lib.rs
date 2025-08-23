@@ -11,6 +11,7 @@ use axum::{
     routing::{get, post},
 };
 use dashmap::DashMap;
+use sqlx::PgPool;
 use tracing::info;
 
 use crate::handlers::{health_check, send_verification_code};
@@ -25,13 +26,16 @@ pub struct AppState {
     pub verification_code_cache: Arc<DashMap<String, (String, Instant)>>,
     /// The email service used to send verification codes.
     pub email_service: Arc<dyn EmailService + Send + Sync>,
+    /// The PostgreSQL database connection pool.
+    pub db_pool: Arc<PgPool>,
 }
 
-pub fn app() -> Router {
-    app_with_email_service(None)
+pub fn app(db_pool: PgPool) -> Router {
+    app_with_email_service(db_pool, None)
 }
 
 pub fn app_with_email_service(
+    db_pool: PgPool,
     email_service: Option<Arc<dyn EmailService + Send + Sync>>,
 ) -> Router {
     let email_service: Arc<dyn EmailService + Send + Sync> = if let Some(service) = email_service {
@@ -41,8 +45,10 @@ pub fn app_with_email_service(
 
         if app_env == "production" {
             info!("Running in production mode with [MailgunEmailer]");
-            let api_key = env::var("MAILGUN_API_KEY").expect("Missing environment variable");
-            let sender = env::var("SENDER_EMAIL").expect("Missing environment variable");
+            let api_key =
+                env::var("MAILGUN_API_KEY").expect("Env variable `MAILGUN_API_KEY` should be set");
+            let sender =
+                env::var("SENDER_EMAIL").expect("Env variable `SENDER_EMAIL` should be set");
             Arc::new(MailgunEmailer::new(api_key, sender))
         } else {
             info!("Running in development mode with [LogEmailer (Mock)]");
@@ -54,6 +60,7 @@ pub fn app_with_email_service(
         rate_limit_cache: Arc::new(DashMap::new()),
         verification_code_cache: Arc::new(DashMap::new()),
         email_service,
+        db_pool: Arc::new(db_pool),
     };
 
     Router::new()

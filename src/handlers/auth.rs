@@ -10,10 +10,7 @@ use tracing::{error, info};
 use validator::Validate;
 
 use crate::AppState;
-use crate::utils::{
-    constant::{EMAIL_RATE_LIMIT, VERIFICATION_CODE_EXPIRY},
-    validator::EMAIL_REGEX,
-};
+use crate::utils::{constant::EMAIL_RATE_LIMIT, validator::EMAIL_REGEX};
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct SendCodeRequest {
@@ -44,15 +41,15 @@ pub async fn send_verification_code(
     }
 
     // 2. Check rate limit
-    if let Some(entry) = state.rate_limit_cache.get(&payload.email) {
-        if entry.elapsed() < EMAIL_RATE_LIMIT {
-            let remaining = EMAIL_RATE_LIMIT - entry.elapsed();
-            let message = format!(
-                "Rate limit exceeded. Try again in {} seconds.",
-                remaining.as_secs()
-            );
-            return (StatusCode::TOO_MANY_REQUESTS, message).into_response();
-        }
+    if let Some(entry) = state.rate_limit_cache.get(&payload.email)
+        && entry.elapsed() < EMAIL_RATE_LIMIT
+    {
+        let remaining = EMAIL_RATE_LIMIT - entry.elapsed();
+        let message = format!(
+            "Rate limit exceeded. Try again in {} seconds.",
+            remaining.as_secs()
+        );
+        return (StatusCode::TOO_MANY_REQUESTS, message).into_response();
     }
 
     // 3. Generate verification code

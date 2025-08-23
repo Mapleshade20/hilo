@@ -27,11 +27,13 @@ sqlx = { version = "0.8", default-features = false, features = [
     "postgres",
     "macros",
     "uuid",
+    "migrate",
 ] }
 thiserror = "2"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1.0", features = ["v4"] }
 validator = { version = "0.20", features = ["derive"] }
 
 
