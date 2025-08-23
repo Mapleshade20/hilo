@@ -1,0 +1,38 @@
+[package]
+name = "hilo"
+version = "0.1.0"
+edition = "2024"
+authors = ["Maple <mapleshade20@gmail.com>"]
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+path = "src/main.rs"
+name = "hilo"
+
+[dependencies]
+async-trait = "0.1"
+axum = "0.8"
+dashmap = "6.1"
+dotenvy = "0.15"
+jsonwebtoken = "9.3"
+rand = "0.9.2"
+regex = "1"
+reqwest = { version = "0.12", features = ["json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sqlx = { version = "0.8", default-features = false, features = [
+    "runtime-tokio",
+    "postgres",
+    "macros",
+    "uuid",
+] }
+thiserror = "2"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+validator = { version = "0.20", features = ["derive"] }
+
+
+[dev-dependencies]

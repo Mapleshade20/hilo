@@ -1,0 +1,38 @@
+version: "3.8"
+
+services:
+  # PostgreSQL database
+  db:
+    image: postgres:15
+    restart: always
+    environment:
+      - POSTGRES_USER=hilo_user
+      - POSTGRES_PASSWORD=hilo_pass
+      - POSTGRES_DB=hilo_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hilo_user -d hilo_db"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Rust application service (only for production)
+  app:
+    build: .
+    ports:
+      - "8090:8090"
+    environment:
+      - DATABASE_URL=postgres://hilo_user:hilo_pass@db:5432/hilo_db
+      - SQLX_OFFLINE=true
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./:/app
+    working_dir: /app
+
+volumes:
+  postgres_data:
