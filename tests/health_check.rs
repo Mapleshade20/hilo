@@ -1,14 +1,16 @@
 mod common;
-use common::spawn_app;
-// use tower::ServiceExt; // for `oneshot`
 
-#[tokio::test]
-async fn health_check_works() {
-    let (address, _) = spawn_app().await;
+use sqlx::PgPool;
+
+use common::spawn_app;
+
+#[sqlx::test]
+async fn health_check_works(pool: PgPool) {
+    let (address, _) = spawn_app(pool).await;
     let client = reqwest::Client::new();
 
     let response = client
-        .get(&format!("{}/health-check", &address))
+        .get(format!("{address}/health-check"))
         .send()
         .await
         .expect("Failed to execute request");

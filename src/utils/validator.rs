@@ -12,7 +12,7 @@ pub static EMAIL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
         .map(regex::escape) // encode special chars like period
         .collect();
     let domains_pattern = escaped_domains.join("|");
-    let pattern = format!(r"^[a-zA-Z0-9._%+-]+@({})$", domains_pattern);
+    let pattern = format!(r"^[a-zA-Z0-9._%+-]+@({domains_pattern})$");
 
     // info!("Using email regex pattern: {}", pattern);
 

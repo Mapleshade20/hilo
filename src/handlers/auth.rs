@@ -10,7 +10,10 @@ use tracing::{error, info};
 use validator::Validate;
 
 use crate::AppState;
-use crate::utils::{constant::EMAIL_RATE_LIMIT, validator::EMAIL_REGEX};
+use crate::utils::{
+    constant::{EMAIL_RATE_LIMIT, VERIFICATION_CODE_EXPIRY},
+    validator::EMAIL_REGEX,
+};
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct SendCodeRequest {
@@ -26,9 +29,17 @@ pub struct VerifyRequest {
     pub code: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AuthResponse {
-    pub token: String,
+    pub access_token: String,
+    pub refresh_token: String,
+    pub token_type: String,
+    pub expires_in: u64,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct RefreshTokenRequest {
+    pub refresh_token: String,
 }
 
 pub async fn send_verification_code(
@@ -37,7 +48,7 @@ pub async fn send_verification_code(
 ) -> impl IntoResponse {
     // 1. Validate format
     if let Err(e) = payload.validate() {
-        return (StatusCode::BAD_REQUEST, format!("Invalid input: {}", e)).into_response();
+        return (StatusCode::BAD_REQUEST, format!("Invalid input: {e}")).into_response();
     }
 
     // 2. Check rate limit
@@ -69,12 +80,12 @@ pub async fn send_verification_code(
         .send_email(
             &payload.email,
             "Your verification code",
-            &format!("Your verification code is: {}", code), // TODO: write good html
+            &format!("Your verification code is: {code}"), // TODO: write good html
         )
         .await
     {
         Err(e) => {
-            error!("Failed to send verification code: {}", e);
+            error!("Failed to send verification code: {e}");
             (StatusCode::INTERNAL_SERVER_ERROR, "Failed to send email").into_response()
         }
         Ok(_) => {
@@ -84,52 +95,89 @@ pub async fn send_verification_code(
     }
 }
 
-// pub async fn verify_code(
-//     State(state): State<Arc<AppState>>,
-//     Json(payload): Json<VerifyRequest>,
-// ) -> impl IntoResponse {
-//     // 1. Validate format
-//     if let Err(e) = payload.validate() {
-//         return (StatusCode::BAD_REQUEST, format!("Invalid input: {}", e)).into_response();
-//     }
+pub async fn verify_code(
+    State(state): State<AppState>,
+    Json(payload): Json<VerifyRequest>,
+) -> impl IntoResponse {
+    // 1. Validate format
+    if let Err(e) = payload.validate() {
+        return (StatusCode::BAD_REQUEST, format!("Invalid input: {e}")).into_response();
+    }
 
-//     // 2. Check verification code
-//     let Some(entry) = state.verification_code_cache.get(&payload.email) else {
-//         return (StatusCode::BAD_REQUEST, "Invalid or expired code").into_response();
-//     };
-//     let (cached_code, created_at) = entry.value();
-//     if cached_code != &payload.code || created_at.elapsed() > VERIFICATION_CODE_EXPIRY {
-//         return (StatusCode::BAD_REQUEST, "Invalid or expired code").into_response();
-//     }
+    // 2. Check verification code (do not leak references into the map)
+    let is_valid = state
+        .verification_code_cache
+        .get(&payload.email)
+        .map(|entry| {
+            let (cached_code, created_at) = entry.value();
+            cached_code == &payload.code && created_at.elapsed() <= VERIFICATION_CODE_EXPIRY
+        })
+        .unwrap_or(false);
+    if !is_valid {
+        return (StatusCode::BAD_REQUEST, "Invalid or expired code").into_response();
+    }
 
-//     // 3. 数据库操作 (假设db_pool在AppState中)
-//     let user_id = sqlx::query_scalar!(
-//         r#"
-//         INSERT INTO users (email, status) VALUES ($1, 'verified')
-//         ON CONFLICT (email) DO UPDATE SET status = 'verified'
-//         RETURNING id
-//         "#,
-//         payload.email
-//     )
-//     .fetch_one(&state.db_pool)
-//     .await
-//     .unwrap(); // 错误处理
+    // 3. Insert user in DB
+    let Ok(user_id) = sqlx::query_scalar!(
+        r#"
+        INSERT INTO users (email, status) VALUES ($1, 'verified')
+        ON CONFLICT (email) DO UPDATE SET status = 'verified'
+        RETURNING id
+        "#,
+        payload.email
+    )
+    .fetch_one(state.db_pool.as_ref())
+    .await
+    else {
+        error!("Database error when inserting user");
+        return (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response();
+    };
 
-//     // 4. 生成JWT
-//     // let claims = Claims { sub: user_id.to_string(), exp: ... };
-//     // let secret = "YOUR_JWT_SECRET"; // 从配置读取
-//     // let token = encode(&Header::default(), &claims, &EncodingKey::from_secret(secret.as_ref())).unwrap();
+    // 4. Generate JWT token pair
+    let token_pair = match state.jwt_service.create_token_pair(user_id).await {
+        Ok(pair) => pair,
+        Err(e) => {
+            error!("Failed to create token pair: {e}");
+            return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to create tokens").into_response();
+        }
+    };
 
-//     // 成功后，从缓存中移除验证码
-//     // state.verification_code_cache.remove(&payload.email);
+    // 5. Remove verification code from cache
+    state.verification_code_cache.remove(&payload.email);
+    // if cache reachs const CODE_CACHE_CAPACITY, remove invalid entries
+    // do this in background task
 
-//     // return (StatusCode::OK, Json(AuthResponse { token })).into_response();
+    (
+        StatusCode::OK,
+        Json(AuthResponse {
+            access_token: token_pair.access_token,
+            refresh_token: token_pair.refresh_token,
+            token_type: "Bearer".to_string(),
+            expires_in: token_pair.expires_in,
+        }),
+    )
+        .into_response()
+}
 
-//     (
-//         StatusCode::OK,
-//         Json(AuthResponse {
-//             token: "fake-jwt-token".to_string(),
-//         }),
-//     )
-//         .into_response() // 模拟成功
-// }
+pub async fn refresh_token(
+    State(state): State<AppState>,
+    Json(payload): Json<RefreshTokenRequest>,
+) -> impl IntoResponse {
+    match state
+        .jwt_service
+        .refresh_token_pair(&payload.refresh_token)
+        .await
+    {
+        Ok(token_pair) => (
+            StatusCode::OK,
+            Json(AuthResponse {
+                access_token: token_pair.access_token,
+                refresh_token: token_pair.refresh_token,
+                token_type: "Bearer".to_string(),
+                expires_in: token_pair.expires_in,
+            }),
+        )
+            .into_response(),
+        Err(_) => (StatusCode::UNAUTHORIZED, "Invalid refresh token").into_response(),
+    }
+}

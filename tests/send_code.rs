@@ -1,19 +1,19 @@
 mod common;
-use common::spawn_app;
+
 use serde_json::json;
+use sqlx::PgPool;
 
-#[tokio::test]
-async fn send_verification_code_works() {
-    let (address, mock_emailer) = spawn_app().await;
+use common::spawn_app;
+
+#[sqlx::test]
+async fn send_verification_code_works(pool: PgPool) {
+    let (address, mock_emailer) = spawn_app(pool).await;
     let client = reqwest::Client::new();
-
-    // Clear any existing emails
-    mock_emailer.clear();
 
     let available_emails = ["test@mails.tsinghua.edu.cn", "test@stu.pku.edu.cn"];
     for test_email in available_emails {
         let response = client
-            .post(&format!("{}/api/auth/send-code", &address))
+            .post(format!("{}/api/auth/send-code", &address))
             .json(&json!({
                     "email": test_email
             }))
@@ -36,15 +36,13 @@ async fn send_verification_code_works() {
     assert!(sent_email.body_html.contains("Your verification code is:"));
 }
 
-#[tokio::test]
-async fn send_verification_code_invalid_email() {
-    let (address, mock_emailer) = spawn_app().await;
+#[sqlx::test]
+async fn send_verification_code_invalid_email(pool: PgPool) {
+    let (address, mock_emailer) = spawn_app(pool).await;
     let client = reqwest::Client::new();
 
-    mock_emailer.clear();
-
     let response = client
-        .post(&format!("{}/api/auth/send-code", &address))
+        .post(format!("{}/api/auth/send-code", &address))
         .json(&json!({
             "email": "invalid-email@tsinghua.edu.cn"
         }))
@@ -58,18 +56,16 @@ async fn send_verification_code_invalid_email() {
     assert_eq!(mock_emailer.sent_count(), 0);
 }
 
-#[tokio::test]
-async fn send_verification_code_rate_limit() {
-    let (address, mock_emailer) = spawn_app().await;
+#[sqlx::test]
+async fn send_verification_code_rate_limit(pool: PgPool) {
+    let (address, mock_emailer) = spawn_app(pool).await;
     let client = reqwest::Client::new();
-
-    mock_emailer.clear();
 
     let test_email = "test@mails.tsinghua.edu.cn";
 
     // Send first request
     let response1 = client
-        .post(&format!("{}/api/auth/send-code", &address))
+        .post(format!("{}/api/auth/send-code", &address))
         .json(&json!({
             "email": test_email
         }))
@@ -82,7 +78,7 @@ async fn send_verification_code_rate_limit() {
 
     // Send second request immediately (should be rate limited)
     let response2 = client
-        .post(&format!("{}/api/auth/send-code", &address))
+        .post(format!("{}/api/auth/send-code", &address))
         .json(&json!({
             "email": test_email
         }))

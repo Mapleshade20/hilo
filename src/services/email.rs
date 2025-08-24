@@ -36,10 +36,10 @@ impl EmailService for LogEmailer {
         body_html: &str,
     ) -> Result<(), EmailError> {
         println!("====== MOCK EMAIL SENT ======");
-        println!("To: {}", recipient);
-        println!("Subject: {}", subject);
+        println!("To: {recipient}");
+        println!("Subject: {subject}");
         println!("-----------------------------");
-        println!("{}", body_html);
+        println!("{body_html}");
         println!("=============================");
 
         Ok(())
@@ -95,13 +95,11 @@ impl EmailService for MailgunEmailer {
                     .await
                     .unwrap_or_else(|_| "Failed to read error response body".to_string());
                 Err(EmailError::SendFailed(format!(
-                    "Mailgun API error: {}",
-                    error_body
+                    "Mailgun API error: {error_body}"
                 )))
             }
             Err(e) => Err(EmailError::SendFailed(format!(
-                "Network request error: {}",
-                e
+                "Network request error: {e}"
             ))),
         }
     }
