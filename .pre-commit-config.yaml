@@ -1,0 +1,21 @@
+repos:
+  - repo: https://github.com/FeryET/pre-commit-rust
+    rev: v1.2.1
+    hooks:
+      - id: cargo-check
+        fail_fast: true
+        stages: [pre-commit]
+      - id: clippy
+        stages: [pre-commit]
+      - id: fmt
+        stages: [pre-commit]
+  - repo: local
+    hooks:
+      - id: sqlx-prepare
+        name: Prepare SQLx
+        description: Ensures sqlx offline data is up-to-date
+        entry: zsh -c 'cargo sqlx prepare -- --all-targets && git add .sqlx'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
