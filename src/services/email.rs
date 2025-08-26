@@ -9,7 +9,7 @@ pub enum EmailError {
 }
 
 #[async_trait]
-pub trait EmailService {
+pub trait EmailService: Send + Sync {
     /// Sends an email.
     ///
     /// This trait defines a method for sending emails. Implementations of this trait

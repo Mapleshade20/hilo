@@ -20,20 +20,46 @@ use tracing::info;
 use crate::handlers::{health_check, refresh_token, send_verification_code, verify_code};
 use crate::services::email::{EmailService, LogEmailer, MailgunEmailer};
 use crate::services::jwt::JwtService;
+use crate::utils::constant::{EMAIL_RATE_LIMIT, VERIFICATION_CODE_EXPIRY};
 
-/// Thread-safe application state shared across requests. (Arc wrapped)
-#[derive(Clone)]
+/// Application state shared across requests. Needs to be thread-safe.
 pub struct AppState {
     /// A map of email addresses to their rate limit timestamps.
-    pub rate_limit_cache: Arc<DashMap<String, Instant>>,
+    pub rate_limit_cache: DashMap<String, Instant>,
     /// A map of email addresses to their verification codes and timestamps.
-    pub verification_code_cache: Arc<DashMap<String, (String, Instant)>>,
+    pub verification_code_cache: DashMap<String, (String, Instant)>,
     /// The email service used to send verification codes.
-    pub email_service: Arc<dyn EmailService + Send + Sync>,
+    pub email_service: Arc<dyn EmailService>,
     /// The PostgreSQL database connection pool.
-    pub db_pool: Arc<PgPool>,
+    pub db_pool: PgPool,
     /// JWT service for token generation and validation.
-    pub jwt_service: Arc<JwtService>,
+    pub jwt_service: JwtService,
+}
+
+impl AppState {
+    pub fn new(
+        email_service: Arc<dyn EmailService>,
+        db_pool: PgPool,
+        jwt_service: JwtService,
+    ) -> Self {
+        Self {
+            rate_limit_cache: DashMap::new(),
+            verification_code_cache: DashMap::new(),
+            email_service,
+            db_pool,
+            jwt_service,
+        }
+    }
+
+    pub fn cleanup_expired_entries(&self) {
+        // Clean verification codes
+        self.verification_code_cache
+            .retain(|_, (_, timestamp)| timestamp.elapsed() <= VERIFICATION_CODE_EXPIRY);
+
+        // Clean rate limits
+        self.rate_limit_cache
+            .retain(|_, timestamp| timestamp.elapsed() <= EMAIL_RATE_LIMIT);
+    }
 }
 
 pub fn app(db_pool: PgPool) -> Router {
@@ -42,11 +68,9 @@ pub fn app(db_pool: PgPool) -> Router {
 
 pub fn app_with_email_service(
     db_pool: PgPool,
-    email_service: Option<Arc<dyn EmailService + Send + Sync>>,
+    email_service: Option<Arc<dyn EmailService>>,
 ) -> Router {
-    let db_pool = Arc::new(db_pool);
-
-    let email_service: Arc<dyn EmailService + Send + Sync> = if let Some(service) = email_service {
+    let email_service: Arc<dyn EmailService> = if let Some(service) = email_service {
         service
     } else {
         let app_env = env::var("APP_ENV").unwrap_or_else(|_| "development".to_string());
@@ -73,16 +97,11 @@ pub fn app_with_email_service(
     let jwt_service = JwtService::new(
         EncodingKey::from_secret(jwt_keys.expose_secret()),
         DecodingKey::from_secret(jwt_keys.expose_secret()),
-        db_pool.clone(),
     );
 
-    let state = AppState {
-        rate_limit_cache: Arc::new(DashMap::new()),
-        verification_code_cache: Arc::new(DashMap::new()),
-        email_service,
-        db_pool,
-        jwt_service: Arc::new(jwt_service),
-    };
+    let state = Arc::new(AppState::new(email_service, db_pool, jwt_service));
+
+    // TODO: a cleanup routine job goes here
 
     Router::new()
         .route("/health-check", get(health_check))

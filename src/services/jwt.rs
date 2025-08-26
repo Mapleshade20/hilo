@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
@@ -41,19 +40,21 @@ pub struct TokenPair {
 pub struct JwtService {
     encoding_key: EncodingKey,
     decoding_key: DecodingKey,
-    db_pool: Arc<PgPool>,
 }
 
 impl JwtService {
-    pub fn new(encoding_key: EncodingKey, decoding_key: DecodingKey, db_pool: Arc<PgPool>) -> Self {
+    pub fn new(encoding_key: EncodingKey, decoding_key: DecodingKey) -> Self {
         Self {
             encoding_key,
             decoding_key,
-            db_pool,
         }
     }
 
-    pub async fn create_token_pair(&self, user_id: Uuid) -> Result<TokenPair, JwtError> {
+    pub async fn create_token_pair(
+        &self,
+        user_id: Uuid,
+        db_pool: &PgPool,
+    ) -> Result<TokenPair, JwtError> {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -86,7 +87,7 @@ impl JwtService {
             refresh_token_hash,
             refresh_token_exp as i64
         )
-        .execute(self.db_pool.as_ref())
+        .execute(db_pool)
         .await?;
 
         Ok(TokenPair {
@@ -106,7 +107,11 @@ impl JwtService {
         }
     }
 
-    pub async fn refresh_token_pair(&self, refresh_token: &str) -> Result<TokenPair, JwtError> {
+    pub async fn refresh_token_pair(
+        &self,
+        refresh_token: &str,
+        db_pool: &PgPool,
+    ) -> Result<TokenPair, JwtError> {
         let mut hasher = Sha256::new();
         hasher.update(refresh_token.as_bytes());
         let refresh_token_hash = format!("{:x}", hasher.finalize());
@@ -120,7 +125,7 @@ impl JwtService {
             "#,
             refresh_token_hash
         )
-        .fetch_optional(self.db_pool.as_ref())
+        .fetch_optional(db_pool)
         .await?;
 
         let token_record = token_record.ok_or(JwtError::RefreshTokenNotFound)?;
@@ -130,14 +135,18 @@ impl JwtService {
             "DELETE FROM refresh_tokens WHERE token_hash = $1",
             refresh_token_hash
         )
-        .execute(self.db_pool.as_ref())
+        .execute(db_pool)
         .await?;
 
         // Create new token pair
-        self.create_token_pair(token_record.user_id).await
+        self.create_token_pair(token_record.user_id, db_pool).await
     }
 
-    pub async fn revoke_refresh_token(&self, refresh_token: &str) -> Result<(), JwtError> {
+    pub async fn revoke_refresh_token(
+        &self,
+        refresh_token: &str,
+        db_pool: &PgPool,
+    ) -> Result<(), JwtError> {
         let mut hasher = Sha256::new();
         hasher.update(refresh_token.as_bytes());
         let refresh_token_hash = format!("{:x}", hasher.finalize());
@@ -146,15 +155,19 @@ impl JwtService {
             "DELETE FROM refresh_tokens WHERE token_hash = $1",
             refresh_token_hash
         )
-        .execute(self.db_pool.as_ref())
+        .execute(db_pool)
         .await?;
 
         Ok(())
     }
 
-    pub async fn revoke_user_refresh_token(&self, user_id: Uuid) -> Result<(), JwtError> {
+    pub async fn revoke_user_refresh_token(
+        &self,
+        user_id: Uuid,
+        db_pool: &PgPool,
+    ) -> Result<(), JwtError> {
         sqlx::query!("DELETE FROM refresh_tokens WHERE user_id = $1", user_id)
-            .execute(self.db_pool.as_ref())
+            .execute(db_pool)
             .await?;
 
         Ok(())

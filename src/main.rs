@@ -24,9 +24,16 @@ async fn main() {
     .await
     .expect("Failed to connect to Postgres");
     let app = app(db_pool);
-    // info!("Server starting at http://{}", addr);
 
-    let listener = TcpListener::bind("0.0.0.0:8090").await.unwrap();
+    let addr = match env::var("APP_ENV")
+        .unwrap_or_else(|_| "development".to_string())
+        .as_str()
+    {
+        "production" => "0.0.0.0:8090",
+        _ => "127.0.0.1:8090",
+    };
+    let listener = TcpListener::bind(addr).await.unwrap();
+    // info!("Server starting at http://{}", addr);
 
     axum::serve(listener, app.into_make_service())
         .await

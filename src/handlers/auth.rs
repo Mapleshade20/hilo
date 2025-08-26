@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::time::Instant;
 
 use axum::{
@@ -5,6 +6,7 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use tracing::{error, info};
 use validator::Validate;
@@ -43,12 +45,12 @@ pub struct RefreshTokenRequest {
 }
 
 pub async fn send_verification_code(
-    State(state): State<AppState>,
+    State(state): State<Arc<AppState>>,
     Json(payload): Json<SendCodeRequest>,
 ) -> impl IntoResponse {
     // 1. Validate format
-    if let Err(e) = payload.validate() {
-        return (StatusCode::BAD_REQUEST, format!("Invalid input: {e}")).into_response();
+    if payload.validate().is_err() {
+        return (StatusCode::BAD_REQUEST, "Invalid input").into_response();
     }
 
     // 2. Check rate limit
@@ -64,7 +66,7 @@ pub async fn send_verification_code(
     }
 
     // 3. Generate verification code
-    let code = format!("{:06}", rand::random::<u32>() % 1_000_000);
+    let code = format!("{:06}", rand::rng().random_range(0..1_000_000));
 
     // 4. Cache code and timestamp
     state
@@ -96,12 +98,12 @@ pub async fn send_verification_code(
 }
 
 pub async fn verify_code(
-    State(state): State<AppState>,
+    State(state): State<Arc<AppState>>,
     Json(payload): Json<VerifyRequest>,
 ) -> impl IntoResponse {
     // 1. Validate format
-    if let Err(e) = payload.validate() {
-        return (StatusCode::BAD_REQUEST, format!("Invalid input: {e}")).into_response();
+    if payload.validate().is_err() {
+        return (StatusCode::BAD_REQUEST, "Invalid input").into_response();
     }
 
     // 2. Check verification code (do not leak references into the map)
@@ -126,7 +128,7 @@ pub async fn verify_code(
         "#,
         payload.email
     )
-    .fetch_one(state.db_pool.as_ref())
+    .fetch_one(&state.db_pool)
     .await
     else {
         error!("Database error when inserting user");
@@ -134,7 +136,11 @@ pub async fn verify_code(
     };
 
     // 4. Generate JWT token pair
-    let token_pair = match state.jwt_service.create_token_pair(user_id).await {
+    let token_pair = match state
+        .jwt_service
+        .create_token_pair(user_id, &state.db_pool)
+        .await
+    {
         Ok(pair) => pair,
         Err(e) => {
             error!("Failed to create token pair: {e}");
@@ -160,12 +166,12 @@ pub async fn verify_code(
 }
 
 pub async fn refresh_token(
-    State(state): State<AppState>,
+    State(state): State<Arc<AppState>>,
     Json(payload): Json<RefreshTokenRequest>,
 ) -> impl IntoResponse {
     match state
         .jwt_service
-        .refresh_token_pair(&payload.refresh_token)
+        .refresh_token_pair(&payload.refresh_token, &state.db_pool)
         .await
     {
         Ok(token_pair) => (
