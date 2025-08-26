@@ -74,7 +74,7 @@ impl EmailService for MockEmailer {
 /// Returned address format: `http://127.0.0.1:8492`
 pub async fn spawn_app(test_db_pool: PgPool) -> (String, Arc<MockEmailer>) {
     let mock_emailer = Arc::new(MockEmailer::new());
-    let mock_cloned = mock_emailer.clone();
+    let mock_cloned = Arc::clone(&mock_emailer);
 
     // Randomly choose an available port
     let listener = TcpListener::bind("127.0.0.1:0")

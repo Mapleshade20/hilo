@@ -32,7 +32,7 @@ async fn send_verification_code_works(pool: PgPool) {
 
     let sent_email = mock_emailer.last_sent_email().expect("No email was sent");
     assert_eq!(&sent_email.recipient, available_emails.last().unwrap());
-    assert_eq!(sent_email.subject, "Your verification code");
+    assert_eq!(sent_email.subject, "Verification code");
     assert!(sent_email.body_html.contains("Your verification code is:"));
 }
 

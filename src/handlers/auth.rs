@@ -1,3 +1,15 @@
+//! # Authentication Handlers
+//!
+//! This module implements HTTP handlers for user authentication using email verification
+//! and JWT tokens. The authentication flow consists of:
+//!
+//! 1. Sending a verification code to the user's email
+//! 2. Verifying the code and creating a user account
+//! 3. Issuing JWT access and refresh tokens
+//! 4. Refreshing tokens when needed
+//!
+//! The email endpoint includes rate limiting and input validation for security.
+
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -12,17 +24,16 @@ use tracing::{error, info};
 use validator::Validate;
 
 use crate::AppState;
-use crate::utils::{
-    constant::{EMAIL_RATE_LIMIT, VERIFICATION_CODE_EXPIRY},
-    validator::EMAIL_REGEX,
-};
+use crate::utils::{constant::*, validator::EMAIL_REGEX};
 
+/// Request payload for sending verification code to email
 #[derive(Debug, Deserialize, Validate)]
 pub struct SendCodeRequest {
     #[validate(regex(path = "*EMAIL_REGEX"))]
     pub email: String,
 }
 
+/// Request payload for verifying email with code
 #[derive(Debug, Deserialize, Validate)]
 pub struct VerifyRequest {
     #[validate(regex(path = "*EMAIL_REGEX"))]
@@ -31,6 +42,7 @@ pub struct VerifyRequest {
     pub code: String,
 }
 
+/// Response containing JWT tokens after successful authentication
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AuthResponse {
     pub access_token: String,
@@ -39,11 +51,27 @@ pub struct AuthResponse {
     pub expires_in: u64,
 }
 
+/// Request payload for refreshing JWT tokens
 #[derive(Debug, Deserialize, Validate)]
 pub struct RefreshTokenRequest {
     pub refresh_token: String,
 }
 
+/// Sends a verification code to the specified email address.
+///
+/// This endpoint generates a 6-digit verification code and sends it via email.
+/// It includes rate limiting to prevent abuse and caches the code for later verification.
+///
+/// # Rate Limiting
+///
+/// Users can only request a verification code once per [`EMAIL_RATE_LIMIT`] duration.
+///
+/// # Returns
+///
+/// - `200 OK` - Verification code sent successfully
+/// - `400 Bad Request` - Invalid email format
+/// - `429 Too Many Requests` - Rate limit exceeded
+/// - `500 Internal Server Error` - Email service failure
 pub async fn send_verification_code(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<SendCodeRequest>,
@@ -81,7 +109,7 @@ pub async fn send_verification_code(
         .email_service
         .send_email(
             &payload.email,
-            "Your verification code",
+            "Verification code",
             &format!("Your verification code is: {code}"), // TODO: write good html
         )
         .await
@@ -97,6 +125,23 @@ pub async fn send_verification_code(
     }
 }
 
+/// Verifies the email verification code and creates user account.
+///
+/// This endpoint validates the verification code sent to the user's email,
+/// creates or updates the user account in the database, and issues JWT tokens
+/// for authentication.
+///
+/// # Security
+///
+/// - Codes expire after [`VERIFICATION_CODE_EXPIRY`] duration
+/// - Codes are removed from cache after successful verification
+/// - User accounts are created with 'verified' status
+///
+/// # Returns
+///
+/// - `200 OK` - Code verified, returns JWT tokens
+/// - `400 Bad Request` - Invalid input or expired/invalid code
+/// - `500 Internal Server Error` - Database or token generation failure
 pub async fn verify_code(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<VerifyRequest>,
@@ -150,7 +195,7 @@ pub async fn verify_code(
 
     // 5. Remove verification code from cache
     state.verification_code_cache.remove(&payload.email);
-    // if cache reachs const CODE_CACHE_CAPACITY, remove invalid entries
+    // if cache reachs const CACHE_CAPACITY, remove invalid entries
     // do this in background task
 
     (
@@ -165,6 +210,22 @@ pub async fn verify_code(
         .into_response()
 }
 
+/// Refreshes JWT token pair using a valid refresh token.
+///
+/// This endpoint allows clients to obtain new access and refresh tokens
+/// using a valid refresh token, extending the user's session without
+/// requiring re-authentication.
+///
+/// # Security
+///
+/// - Refresh tokens are validated against the database
+/// - Old refresh tokens are invalidated when new ones are issued
+/// - Invalid refresh tokens result in unauthorized response
+///
+/// # Returns
+///
+/// - `200 OK` - New token pair issued successfully
+/// - `401 Unauthorized` - Invalid or expired refresh token
 pub async fn refresh_token(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<RefreshTokenRequest>,

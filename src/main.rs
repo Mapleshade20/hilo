@@ -1,3 +1,16 @@
+//! # Hilo Application Entry Point
+//!
+//! ## Environment Variables
+//!
+//! - `DATABASE_URL` - PostgreSQL connection string (required)
+//! - `APP_ENV` - Application environment ("production" or "development")
+//!
+//! ## Server Configuration
+//!
+//! - **Production**: Binds to `0.0.0.0:8090` for external access
+//! - **Development**: Binds to `127.0.0.1:8090` for local access only
+
+use std::borrow::Cow;
 use std::env;
 
 use hilo::app;
@@ -26,8 +39,9 @@ async fn main() {
     let app = app(db_pool);
 
     let addr = match env::var("APP_ENV")
-        .unwrap_or_else(|_| "development".to_string())
-        .as_str()
+        .map(Cow::Owned)
+        .unwrap_or_else(|_| Cow::Borrowed("development"))
+        .as_ref()
     {
         "production" => "0.0.0.0:8090",
         _ => "127.0.0.1:8090",

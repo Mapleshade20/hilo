@@ -1,3 +1,22 @@
+//! # JWT Service
+//!
+//! This module provides JSON Web Token (JWT) functionality for user authentication.
+//! It handles token creation, validation, and refresh token management with
+//! secure database storage.
+//!
+//! ## Features
+//!
+//! - Access token generation and validation
+//! - Refresh token management with database persistence
+//! - Token rotation for enhanced security
+//! - Bulk token revocation for user sessions
+//!
+//! ## Security
+//!
+//! - Refresh tokens are hashed before database storage
+//! - Tokens have configurable expiration times
+//! - Old refresh tokens are invalidated when new ones are issued (token rotation)
+
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
@@ -7,8 +26,9 @@ use sqlx::PgPool;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::utils::constant::{ACCESS_TOKEN_EXPIRY, REFRESH_TOKEN_EXPIRY};
+use crate::utils::constant::*;
 
+/// Errors that can occur during JWT operations
 #[derive(Debug, Error)]
 pub enum JwtError {
     #[error("Token encoding failed: {0}")]
@@ -23,26 +43,41 @@ pub enum JwtError {
     RefreshTokenNotFound,
 }
 
+/// JWT claims structure for access tokens
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
-    pub sub: String, // user_id as string
-    pub exp: u64,    // expiration timestamp
-    pub iat: u64,    // issued at timestamp
+    /// Subject (user ID as string)
+    pub sub: String,
+    /// Expiration timestamp (Unix epoch)
+    pub exp: u64,
+    /// Issued at timestamp (Unix epoch)
+    pub iat: u64,
 }
 
+/// Token pair containing access and refresh tokens
 #[derive(Debug, Serialize)]
 pub struct TokenPair {
+    /// JWT access token for API authentication
     pub access_token: String,
+    /// Refresh token for obtaining new access tokens
     pub refresh_token: String,
-    pub expires_in: u64, // access token expiry in seconds
+    /// Access token expiry time in seconds
+    pub expires_in: u64,
 }
 
+/// Service for managing JWT tokens and refresh token lifecycle
 pub struct JwtService {
     encoding_key: EncodingKey,
     decoding_key: DecodingKey,
 }
 
 impl JwtService {
+    /// Creates a new JWT service with the provided keys.
+    ///
+    /// # Arguments
+    ///
+    /// * `encoding_key` - Key used for signing JWT tokens
+    /// * `decoding_key` - Key used for verifying JWT tokens
     pub fn new(encoding_key: EncodingKey, decoding_key: DecodingKey) -> Self {
         Self {
             encoding_key,
@@ -50,6 +85,23 @@ impl JwtService {
         }
     }
 
+    /// Creates a new access and refresh token pair for the user.
+    ///
+    /// The refresh token is securely hashed before storage in the database.
+    /// Access tokens are short-lived while refresh tokens have longer expiration.
+    ///
+    /// # Arguments
+    ///
+    /// * `user_id` - Unique identifier for the user
+    /// * `db_pool` - Database connection pool for storing refresh token
+    ///
+    /// # Returns
+    ///
+    /// Returns a [`TokenPair`] containing both tokens and expiration info.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`JwtError`] if token creation or database storage fails.
     pub async fn create_token_pair(
         &self,
         user_id: Uuid,
@@ -57,7 +109,7 @@ impl JwtService {
     ) -> Result<TokenPair, JwtError> {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .expect("System time should not be before UNIX EPOCH")
             .as_secs();
 
         let access_token_exp = now + ACCESS_TOKEN_EXPIRY.as_secs();
@@ -65,7 +117,7 @@ impl JwtService {
 
         // Create access token
         let access_claims = Claims {
-            sub: user_id.to_string(),
+            sub: user_id.as_simple().to_string(),
             exp: access_token_exp,
             iat: now,
         };
@@ -97,6 +149,23 @@ impl JwtService {
         })
     }
 
+    /// Validates an access token and returns its claims.
+    ///
+    /// This method verifies the token signature and checks expiration.
+    /// It does not perform database lookups for validation.
+    ///
+    /// # Arguments
+    ///
+    /// * `token` - JWT access token to validate
+    ///
+    /// # Returns
+    ///
+    /// Returns the [`Claims`] if the token is valid and not expired.
+    ///
+    /// # Errors
+    ///
+    /// - [`JwtError::TokenExpired`] - Token has expired
+    /// - [`JwtError::InvalidToken`] - Token is malformed or has invalid signature
     pub fn validate_access_token(&self, token: &str) -> Result<Claims, JwtError> {
         match decode::<Claims>(token, &self.decoding_key, &Validation::default()) {
             Ok(token_data) => Ok(token_data.claims),
@@ -107,6 +176,24 @@ impl JwtService {
         }
     }
 
+    /// Creates a new token pair using a valid refresh token.
+    ///
+    /// This method implements token rotation - the old refresh token is invalidated
+    /// and a new refresh token is created along with a new access token.
+    ///
+    /// # Arguments
+    ///
+    /// * `refresh_token` - Current valid refresh token
+    /// * `db_pool` - Database connection pool for token validation and storage
+    ///
+    /// # Returns
+    ///
+    /// Returns a new [`TokenPair`] with fresh tokens.
+    ///
+    /// # Errors
+    ///
+    /// - [`JwtError::RefreshTokenNotFound`] - Token not found or expired
+    /// - [`JwtError::DatabaseError`] - Database operation failed
     pub async fn refresh_token_pair(
         &self,
         refresh_token: &str,
@@ -142,6 +229,19 @@ impl JwtService {
         self.create_token_pair(token_record.user_id, db_pool).await
     }
 
+    /// Revokes a specific refresh token.
+    ///
+    /// This method removes the refresh token from the database, preventing
+    /// its future use. Useful for implementing logout functionality.
+    ///
+    /// # Arguments
+    ///
+    /// * `refresh_token` - Refresh token to revoke
+    /// * `db_pool` - Database connection pool
+    ///
+    /// # Errors
+    ///
+    /// Returns [`JwtError::DatabaseError`] if the database operation fails.
     pub async fn revoke_refresh_token(
         &self,
         refresh_token: &str,
@@ -161,6 +261,20 @@ impl JwtService {
         Ok(())
     }
 
+    /// Revokes all refresh tokens for a specific user.
+    ///
+    /// This method removes all refresh tokens associated with a user,
+    /// effectively logging them out from all devices. Useful for security
+    /// purposes or account management.
+    ///
+    /// # Arguments
+    ///
+    /// * `user_id` - User whose tokens should be revoked
+    /// * `db_pool` - Database connection pool
+    ///
+    /// # Errors
+    ///
+    /// Returns [`JwtError::DatabaseError`] if the database operation fails.
     pub async fn revoke_user_refresh_token(
         &self,
         user_id: Uuid,

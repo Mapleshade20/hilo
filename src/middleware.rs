@@ -1,3 +1,8 @@
+//! # Middleware Components
+//!
+//! This module contains middleware functions that handle cross-cutting concerns
+//! such as authentication, authorization, and request processing.
+
 use axum::{
     extract::{Request, State},
     http::{StatusCode, header},
@@ -8,6 +13,31 @@ use uuid::Uuid;
 
 use crate::{AppState, services::jwt::Claims};
 
+/// Authentication middleware for protecting routes
+///
+/// This middleware validates JWT access tokens from the Authorization header
+/// and extracts user information for use by downstream handlers. Protected
+/// routes will automatically receive the authenticated user context.
+///
+/// # Authentication Flow
+///
+/// 1. Extracts `Authorization` header with `Bearer <token>` format
+/// 2. Validates the JWT token signature and expiration
+/// 3. Parses user ID from token claims
+/// 4. Adds [`AuthUser`] to request extensions for handler access
+///
+/// # Returns
+///
+/// - **Success**: Continues to next handler with user context
+/// - **Failure**: Returns `401 Unauthorized` for invalid/missing tokens
+///
+/// # Usage
+///
+/// ```rust
+/// Router::new()
+///     .route("/protected", get(protected_handler))
+///     .layer(middleware::from_fn_with_state(state, auth_middleware))
+/// ```
 pub async fn auth_middleware(
     State(state): State<AppState>,
     mut req: Request,
@@ -42,8 +72,22 @@ pub async fn auth_middleware(
     }
 }
 
+/// Authenticated user information available to handlers
+///
+/// This struct is inserted into request extensions by the authentication
+/// middleware and can be extracted by route handlers that need user context.
+///
+/// # Usage in Handlers
+///
+/// ```rust
+/// async fn protected_handler(Extension(user): Extension<AuthUser>) -> impl IntoResponse {
+///     format!("Hello user: {}", user.user_id)
+/// }
+/// ```
 #[derive(Debug, Clone)]
 pub struct AuthUser {
+    /// Unique identifier for the authenticated user
     pub user_id: Uuid,
+    /// JWT claims containing additional token metadata
     pub claims: Claims,
 }

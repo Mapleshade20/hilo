@@ -1,21 +1,23 @@
 # Agent Guidelines for Hilo Project
 
+This is the backend of a social matching project. It authenticates male and female users with their school emails, collects their completed questionnaire, finds a best match based on their interests and expectations, and provides query, submission and admin-trigger APIs.
+
 ## Build/Test Commands
 
 - **Build**: `cargo build`
 - **Test all**: `cargo test`
 - **Test single**: `cargo test --test test_name`
-- **Migrations**: `sqlx migrate run` (requires `DATABASE_URL` env var)
+- **Migrations**: `sqlx migrate run`/`sqlx migrate revert` (requires `DATABASE_URL` env var set)
 
 ## Code Style
 
 - Import standard library first, then external crates, then local modules
 - Use `tracing` crate's macros `info!`, `error!`, `debug!`, `warning` for logging instead of println
 - Prefer `Arc<T>` for shared state's child fields, `DashMap` for concurrent hashmaps
-- Use `async-trait` for async traits
 - Constants go in `utils/constant.rs` with UPPER_SNAKE_CASE
-- Use `thiserror` for custom error types, `secrecy` for sensitive data
+- Use `thiserror` for custom error types
 - Postgres database queries use sqlx macros for compile-time checking
+- Make sure to follow good and idiomatic Rust coding style of the community
 
 ## Notes for integration tests
 
