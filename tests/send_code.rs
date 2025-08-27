@@ -1,9 +1,8 @@
 mod common;
 
+use common::spawn_app;
 use serde_json::json;
 use sqlx::PgPool;
-
-use common::spawn_app;
 
 #[sqlx::test]
 async fn send_verification_code_works(pool: PgPool) {

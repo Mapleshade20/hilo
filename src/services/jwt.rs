@@ -24,6 +24,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 use thiserror::Error;
+use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 
 use crate::utils::constant::*;
@@ -102,11 +103,14 @@ impl JwtService {
     /// # Errors
     ///
     /// Returns [`JwtError`] if token creation or database storage fails.
+    #[instrument(skip(self, db_pool), fields(user_id = %user_id))]
     pub async fn create_token_pair(
         &self,
         user_id: Uuid,
         db_pool: &PgPool,
     ) -> Result<TokenPair, JwtError> {
+        debug!("Creating new token pair");
+
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("System time should not be before UNIX EPOCH")
@@ -122,15 +126,17 @@ impl JwtService {
             iat: now,
         };
         let access_token = encode(&Header::default(), &access_claims, &self.encoding_key)?;
+        debug!("Access token created");
 
         // Create refresh token
         let refresh_token = Uuid::new_v4().to_string();
         let mut hasher = Sha256::new();
         hasher.update(refresh_token.as_bytes());
         let refresh_token_hash = format!("{:x}", hasher.finalize());
+        debug!("Refresh token generated and hashed");
 
         // Store refresh token in database
-        sqlx::query!(
+        match sqlx::query!(
             r#"
             INSERT INTO refresh_tokens (user_id, token_hash, expires_at) 
             VALUES ($1, $2, to_timestamp($3))
@@ -140,7 +146,16 @@ impl JwtService {
             refresh_token_exp as i64
         )
         .execute(db_pool)
-        .await?;
+        .await
+        {
+            Ok(_) => {
+                debug!("Refresh token stored in database");
+            }
+            Err(e) => {
+                error!(error = %e, "Failed to store refresh token in database");
+                return Err(JwtError::DatabaseError(e));
+            }
+        }
 
         Ok(TokenPair {
             access_token,
@@ -166,13 +181,23 @@ impl JwtService {
     ///
     /// - [`JwtError::TokenExpired`] - Token has expired
     /// - [`JwtError::InvalidToken`] - Token is malformed or has invalid signature
+    #[instrument(skip(self, token), fields(token_length = token.len()))]
     pub fn validate_access_token(&self, token: &str) -> Result<Claims, JwtError> {
+        debug!("Validating access token");
+
         match decode::<Claims>(token, &self.decoding_key, &Validation::default()) {
-            Ok(token_data) => Ok(token_data.claims),
+            Ok(token_data) => {
+                debug!(user_id = %token_data.claims.sub, "Access token validated successfully");
+                Ok(token_data.claims)
+            }
             Err(e) if e.kind() == &jsonwebtoken::errors::ErrorKind::ExpiredSignature => {
+                warn!("Access token expired");
                 Err(JwtError::TokenExpired)
             }
-            Err(_) => Err(JwtError::InvalidToken),
+            Err(e) => {
+                warn!(error = %e, "Invalid access token");
+                Err(JwtError::InvalidToken)
+            }
         }
     }
 
@@ -194,17 +219,20 @@ impl JwtService {
     ///
     /// - [`JwtError::RefreshTokenNotFound`] - Token not found or expired
     /// - [`JwtError::DatabaseError`] - Database operation failed
+    #[instrument(skip(self, refresh_token, db_pool), fields(token_length = refresh_token.len()))]
     pub async fn refresh_token_pair(
         &self,
         refresh_token: &str,
         db_pool: &PgPool,
     ) -> Result<TokenPair, JwtError> {
+        debug!("Processing token refresh");
+
         let mut hasher = Sha256::new();
         hasher.update(refresh_token.as_bytes());
         let refresh_token_hash = format!("{:x}", hasher.finalize());
 
         // Verify refresh token exists and is not expired
-        let token_record = sqlx::query!(
+        let token_record = match sqlx::query!(
             r#"
             SELECT user_id, expires_at
             FROM refresh_tokens 
@@ -213,19 +241,43 @@ impl JwtService {
             refresh_token_hash
         )
         .fetch_optional(db_pool)
-        .await?;
+        .await
+        {
+            Ok(record) => record,
+            Err(e) => {
+                error!(error = %e, "Database error during refresh token lookup");
+                return Err(JwtError::DatabaseError(e));
+            }
+        };
 
-        let token_record = token_record.ok_or(JwtError::RefreshTokenNotFound)?;
+        let token_record = match token_record {
+            Some(record) => {
+                debug!(user_id = %record.user_id, "Refresh token found and valid");
+                record
+            }
+            None => {
+                warn!("Refresh token not found or expired");
+                return Err(JwtError::RefreshTokenNotFound);
+            }
+        };
 
         // Delete the old refresh token (token rotation)
-        sqlx::query!(
+        match sqlx::query!(
             "DELETE FROM refresh_tokens WHERE token_hash = $1",
             refresh_token_hash
         )
         .execute(db_pool)
-        .await?;
+        .await
+        {
+            Ok(_) => debug!("Old refresh token deleted"),
+            Err(e) => {
+                error!(error = %e, "Failed to delete old refresh token");
+                return Err(JwtError::DatabaseError(e));
+            }
+        }
 
         // Create new token pair
+        info!(user_id = %token_record.user_id, "Creating new token pair for refresh");
         self.create_token_pair(token_record.user_id, db_pool).await
     }
 
@@ -242,23 +294,38 @@ impl JwtService {
     /// # Errors
     ///
     /// Returns [`JwtError::DatabaseError`] if the database operation fails.
+    #[instrument(skip(self, refresh_token, db_pool), fields(token_length = refresh_token.len()))]
     pub async fn revoke_refresh_token(
         &self,
         refresh_token: &str,
         db_pool: &PgPool,
     ) -> Result<(), JwtError> {
+        debug!("Revoking refresh token");
+
         let mut hasher = Sha256::new();
         hasher.update(refresh_token.as_bytes());
         let refresh_token_hash = format!("{:x}", hasher.finalize());
 
-        sqlx::query!(
+        match sqlx::query!(
             "DELETE FROM refresh_tokens WHERE token_hash = $1",
             refresh_token_hash
         )
         .execute(db_pool)
-        .await?;
-
-        Ok(())
+        .await
+        {
+            Ok(result) => {
+                if result.rows_affected() > 0 {
+                    info!("Refresh token revoked successfully");
+                } else {
+                    debug!("Refresh token not found for revocation");
+                }
+                Ok(())
+            }
+            Err(e) => {
+                error!(error = %e, "Failed to revoke refresh token");
+                Err(JwtError::DatabaseError(e))
+            }
+        }
     }
 
     /// Revokes all refresh tokens for a specific user.
@@ -275,15 +342,29 @@ impl JwtService {
     /// # Errors
     ///
     /// Returns [`JwtError::DatabaseError`] if the database operation fails.
+    #[instrument(skip(self, db_pool), fields(user_id = %user_id))]
     pub async fn revoke_user_refresh_token(
         &self,
         user_id: Uuid,
         db_pool: &PgPool,
     ) -> Result<(), JwtError> {
-        sqlx::query!("DELETE FROM refresh_tokens WHERE user_id = $1", user_id)
-            .execute(db_pool)
-            .await?;
+        debug!("Revoking all refresh tokens for user");
 
-        Ok(())
+        match sqlx::query!("DELETE FROM refresh_tokens WHERE user_id = $1", user_id)
+            .execute(db_pool)
+            .await
+        {
+            Ok(result) => {
+                info!(
+                    tokens_revoked = result.rows_affected(),
+                    "All refresh tokens revoked for user"
+                );
+                Ok(())
+            }
+            Err(e) => {
+                error!(error = %e, "Failed to revoke user refresh tokens");
+                Err(JwtError::DatabaseError(e))
+            }
+        }
     }
 }

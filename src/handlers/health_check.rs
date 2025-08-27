@@ -5,6 +5,7 @@
 //! deployment tools to verify that the application is running.
 
 use axum::http::StatusCode;
+use tracing::{debug, instrument};
 
 /// Health check endpoint that returns 200 OK.
 ///
@@ -15,6 +16,8 @@ use axum::http::StatusCode;
 /// # Returns
 ///
 /// Always returns `200 OK` status code.
+#[instrument]
 pub async fn health_check() -> StatusCode {
+    debug!("Health check endpoint accessed");
     StatusCode::OK
 }

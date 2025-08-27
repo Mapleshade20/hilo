@@ -3,10 +3,9 @@
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
+use hilo::services::email::{EmailError, EmailService};
 use sqlx::PgPool;
 use tokio::net::TcpListener;
-
-use hilo::services::email::{EmailError, EmailService};
 
 /// A mock email service that stores sent emails for testing purposes.
 /// This is ideal for integration tests as it doesn't produce console output.

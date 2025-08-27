@@ -9,9 +9,10 @@ use axum::{
     middleware::Next,
     response::Response,
 };
+use tracing::{debug, error, instrument, warn};
 use uuid::Uuid;
 
-use crate::{AppState, services::jwt::Claims};
+use crate::{services::jwt::Claims, state::AppState};
 
 /// Authentication middleware for protecting routes
 ///
@@ -30,45 +31,57 @@ use crate::{AppState, services::jwt::Claims};
 ///
 /// - **Success**: Continues to next handler with user context
 /// - **Failure**: Returns `401 Unauthorized` for invalid/missing tokens
-///
-/// # Usage
-///
-/// ```rust
-/// Router::new()
-///     .route("/protected", get(protected_handler))
-///     .layer(middleware::from_fn_with_state(state, auth_middleware))
-/// ```
+#[instrument(
+    skip(state, req, next),
+    fields(
+        method = %req.method(),
+        uri = %req.uri(),
+        request_id = %uuid::Uuid::new_v4()
+    )
+)]
 pub async fn auth_middleware(
     State(state): State<AppState>,
     mut req: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
+    debug!("Processing authentication middleware");
+
     let auth_header = req
         .headers()
         .get(header::AUTHORIZATION)
         .and_then(|header| header.to_str().ok());
 
     let Some(auth_header) = auth_header else {
+        warn!("Missing Authorization header");
         return Err(StatusCode::UNAUTHORIZED);
     };
 
     if !auth_header.starts_with("Bearer ") {
+        warn!("Invalid Authorization header format");
         return Err(StatusCode::UNAUTHORIZED);
     }
 
     let token = auth_header.trim_start_matches("Bearer ");
+    debug!("Extracted bearer token from Authorization header");
 
     match state.jwt_service.validate_access_token(token) {
         Ok(claims) => {
-            let user_id = claims
-                .sub
-                .parse::<Uuid>()
-                .map_err(|_| StatusCode::UNAUTHORIZED)?;
+            let user_id = claims.sub.parse::<Uuid>().map_err(|e| {
+                error!(error = %e, "Failed to parse user ID from token claims");
+                StatusCode::UNAUTHORIZED
+            })?;
 
+            debug!(user_id = %user_id, "Authentication successful");
             req.extensions_mut().insert(AuthUser { user_id, claims });
-            Ok(next.run(req).await)
+
+            let response = next.run(req).await;
+            debug!("Request processed successfully");
+            Ok(response)
         }
-        Err(_) => Err(StatusCode::UNAUTHORIZED),
+        Err(e) => {
+            warn!(error = %e, "Token validation failed");
+            Err(StatusCode::UNAUTHORIZED)
+        }
     }
 }
 
@@ -80,6 +93,8 @@ pub async fn auth_middleware(
 /// # Usage in Handlers
 ///
 /// ```rust
+/// use axum::{extract::Extension, response::IntoResponse};
+/// use hilo::middleware::AuthUser;
 /// async fn protected_handler(Extension(user): Extension<AuthUser>) -> impl IntoResponse {
 ///     format!("Hello user: {}", user.user_id)
 /// }

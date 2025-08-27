@@ -34,8 +34,13 @@ sqlx = { version = "0.8", default-features = false, features = [
 ] }
 thiserror = "2"
 tokio = { version = "1", features = ["full"] }
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing = { version = "0.1", features = ["attributes"] }
+tracing-subscriber = { version = "0.3", features = [
+    "ansi",
+    "env-filter",
+    "json",
+] }
+tracing-bunyan-formatter = "0.3"
 uuid = { version = "1.0", features = ["v4"] }
 validator = { version = "0.20", features = ["derive"] }
 

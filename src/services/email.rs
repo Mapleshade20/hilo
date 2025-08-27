@@ -18,6 +18,7 @@
 use async_trait::async_trait;
 use serde_json::json;
 use thiserror::Error;
+use tracing::{debug, error, info, instrument};
 
 /// Errors that can occur during email operations
 #[derive(Debug, Error)]
@@ -62,12 +63,15 @@ pub struct LogEmailer;
 
 #[async_trait]
 impl EmailService for LogEmailer {
+    #[instrument(skip(self, body_html), fields(recipient = %recipient, subject = %subject))]
     async fn send_email(
         &self,
         recipient: &str,
         subject: &str,
         body_html: &str,
     ) -> Result<(), EmailError> {
+        info!("Sending mock email");
+
         println!("====== MOCK EMAIL SENT ======");
         println!("To: {recipient}");
         println!("Subject: {subject}");
@@ -75,6 +79,7 @@ impl EmailService for LogEmailer {
         println!("{body_html}");
         println!("=============================");
 
+        debug!("Mock email logged to console");
         Ok(())
     }
 }
@@ -106,6 +111,12 @@ impl ExternalEmailer {
     /// * `api_key` - Authentication key for the email service
     /// * `sender_email` - Email address to use as the sender
     pub fn new(api_url: String, api_key: String, sender_email: String) -> Self {
+        info!(
+            api_url = %api_url,
+            sender_email = %sender_email,
+            "Initializing external email service"
+        );
+
         Self {
             api_url,
             api_key,
@@ -117,12 +128,22 @@ impl ExternalEmailer {
 
 #[async_trait]
 impl EmailService for ExternalEmailer {
+    #[instrument(
+        skip(self, body_html),
+        fields(
+            recipient = %recipient,
+            subject = %subject,
+            sender = %self.sender_email
+        )
+    )]
     async fn send_email(
         &self,
         recipient: &str,
         subject: &str,
         body_html: &str,
     ) -> Result<(), EmailError> {
+        debug!("Preparing to send email via external API");
+
         let payload = json!({
             "to": recipient,
             "from": self.sender_email,
@@ -130,6 +151,7 @@ impl EmailService for ExternalEmailer {
             "content": [{ "type": "text/html", "value": body_html }]
         });
 
+        debug!("Sending HTTP request to email API");
         let response = self
             .http_client
             .post(&self.api_url)
@@ -139,19 +161,33 @@ impl EmailService for ExternalEmailer {
             .await;
 
         match response {
-            Ok(res) if res.status().is_success() => Ok(()),
+            Ok(res) if res.status().is_success() => {
+                info!("Email sent successfully via external API");
+                Ok(())
+            }
             Ok(res) => {
+                let status = res.status();
                 let error_body = res
                     .text()
                     .await
                     .unwrap_or_else(|_| "Failed to read error response body".to_string());
+
+                error!(
+                    status = %status,
+                    error_body = %error_body,
+                    "External email API returned error"
+                );
+
                 Err(EmailError::SendFailed(format!(
                     "Third party email provider API error: {error_body}"
                 )))
             }
-            Err(e) => Err(EmailError::SendFailed(format!(
-                "Network request error: {e}"
-            ))),
+            Err(e) => {
+                error!(error = %e, "Network request to email API failed");
+                Err(EmailError::SendFailed(format!(
+                    "Network request error: {e}"
+                )))
+            }
         }
     }
 }

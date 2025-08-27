@@ -1,8 +1,7 @@
 mod common;
 
-use sqlx::PgPool;
-
 use common::spawn_app;
+use sqlx::PgPool;
 
 #[sqlx::test]
 async fn health_check_works(pool: PgPool) {

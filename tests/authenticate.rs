@@ -1,11 +1,11 @@
+mod common;
+
 use std::sync::Arc;
 
-use serde_json::json;
-use sqlx::PgPool;
-
-mod common;
 use common::{MockEmailer, spawn_app};
 use hilo::handlers::AuthResponse;
+use serde_json::json;
+use sqlx::PgPool;
 
 // Helper function to extract verification code from email body
 fn extract_verification_code(email_body: &str) -> &str {
