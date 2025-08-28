@@ -2,6 +2,7 @@ mod common;
 
 use common::{get_access_token, spawn_app};
 use hilo::handlers::ProfileResponse;
+use hilo::utils::user_status::UserStatus;
 use sqlx::PgPool;
 
 #[sqlx::test]
@@ -16,7 +17,7 @@ async fn test_profile_with_valid_token(pool: PgPool) {
     // Access profile endpoint with valid token
     let response = client
         .get(format!("{}/api/profile", &address))
-        .header("Authorization", format!("Bearer {}", access_token))
+        .header("Authorization", format!("Bearer {access_token}"))
         .send()
         .await
         .expect("Failed to execute request");
@@ -25,7 +26,7 @@ async fn test_profile_with_valid_token(pool: PgPool) {
 
     let profile: ProfileResponse = response.json().await.expect("Failed to parse response");
     assert_eq!(profile.email, test_email);
-    assert_eq!(profile.status, "verified");
+    assert_eq!(profile.status, UserStatus::Unverified);
 }
 
 #[sqlx::test]
@@ -113,6 +114,6 @@ async fn test_profile_multiple_users(pool: PgPool) {
 
         let profile: ProfileResponse = response.json().await.expect("Failed to parse response");
         assert_eq!(profile.email, *email);
-        assert_eq!(profile.status, "verified");
+        assert_eq!(profile.status, UserStatus::Unverified);
     }
 }

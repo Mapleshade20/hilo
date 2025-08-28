@@ -35,12 +35,21 @@ async fn main() {
     info!("Connected to PostgreSQL database");
     let app = app(db_pool);
 
-    // 3. Start server at specified address
+    // 3. Create a future that resolves on Ctrl+C
+    let shutdown_signal = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("Failed to listen for ctrl_c signal");
+        info!("Ctrl+C received, shutting down");
+    };
+
+    // 4. Start server at specified address
     let addr = env::var("ADDRESS").expect("Env variable `ADDRESS` should be set");
     let listener = TcpListener::bind(&addr).await.unwrap();
     info!("Server starting at http://{}", addr);
 
     axum::serve(listener, app.into_make_service())
+        .with_graceful_shutdown(shutdown_signal)
         .await
         .unwrap();
 }
@@ -60,24 +69,18 @@ fn init_tracing() {
                 "hilo".into(),
                 std::io::stdout,
             );
-            Some(Box::new(formatting_layer) as Box<dyn tracing_subscriber::Layer<_> + Send + Sync>)
+            Box::new(formatting_layer) as Box<dyn tracing_subscriber::Layer<_> + Send + Sync>
         }
         _ => {
-            let formatting_layer = tracing_subscriber::fmt::layer()
-                .with_file(true)
-                .with_line_number(true)
-                .with_target(false);
-            Some(Box::new(formatting_layer) as Box<dyn tracing_subscriber::Layer<_> + Send + Sync>)
+            let formatting_layer = tracing_subscriber::fmt::layer().with_line_number(true);
+            Box::new(formatting_layer) as Box<dyn tracing_subscriber::Layer<_> + Send + Sync>
         }
     };
 
-    let registry = tracing_subscriber::registry().with(env_filter);
-
-    if let Some(layer) = format_layer {
-        registry.with(layer).init();
-    } else {
-        registry.init();
-    }
+    tracing_subscriber::registry()
+        .with(env_filter)
+        .with(format_layer)
+        .init();
 
     info!("Tracing initialized");
 }

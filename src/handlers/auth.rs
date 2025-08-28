@@ -151,11 +151,11 @@ pub async fn send_verification_code(
 ///
 /// - Codes expire after [`VERIFICATION_CODE_EXPIRY`] duration
 /// - Codes are removed from cache after successful verification
-/// - User accounts are created with 'verified' status
+/// - User accounts are created with 'unverified' status
 ///
 /// # Returns
 ///
-/// - `200 OK` - Code verified, returns JWT tokens
+/// - `200 OK` - Code correct, returns JWT tokens
 /// - `400 Bad Request` - Invalid input or expired/invalid code
 /// - `500 Internal Server Error` - Database or token generation failure
 #[instrument(
@@ -203,8 +203,8 @@ pub async fn verify_code(
     debug!("Creating/updating user in database");
     let Ok(user_id) = sqlx::query_scalar!(
         r#"
-        INSERT INTO users (email, status) VALUES ($1, 'verified')
-        ON CONFLICT (email) DO UPDATE SET status = 'verified'
+        INSERT INTO users (email, status) VALUES ($1, 'unverified')
+        ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
         RETURNING id
         "#,
         payload.email

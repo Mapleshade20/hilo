@@ -284,29 +284,3 @@ async fn test_multiple_users_different_codes(pool: PgPool) {
         assert_eq!(response.status(), reqwest::StatusCode::OK);
     }
 }
-
-// This test would be for protected endpoints when they're implemented
-// #[sqlx::test]
-// async fn test_protected_endpoint_with_valid_token(_pool: PgPool) {
-//     // TODO: Implement when protected endpoints are added
-//     // This test should:
-//     // 1. Complete auth flow to get access token
-//     // 2. Use access token to access protected endpoint
-//     // 3. Verify successful access
-// }
-
-// #[sqlx::test]
-// async fn test_protected_endpoint_with_invalid_token(_pool: PgPool) {
-//     // TODO: Implement when protected endpoints are added
-//     // This test should:
-//     // 1. Try to access protected endpoint with invalid/expired token
-//     // 2. Verify access is denied
-// }
-//
-// #[sqlx::test]
-// async fn test_protected_endpoint_without_token(_pool: PgPool) {
-//     // TODO: Implement when protected endpoints are added
-//     // This test should:
-//     // 1. Try to access protected endpoint without any token
-//     // 2. Verify access is denied
-// }

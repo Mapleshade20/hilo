@@ -8,6 +8,8 @@
 //!
 //! - **Constants** (`constant`) - Application-wide configuration constants
 //! - **Validators** (`validator`) - Input validation utilities and regex patterns
+//! - **User Status** (`user_status`) - User status enum types and utilities
 
 pub mod constant;
+pub mod user_status;
 pub mod validator;

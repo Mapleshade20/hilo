@@ -14,7 +14,7 @@ repos:
       - id: sqlx-prepare
         name: Prepare SQLx
         description: Ensures sqlx offline data is up-to-date
-        entry: zsh -c 'cargo sqlx prepare -- --all-targets && git add .sqlx'
+        entry: cargo sqlx prepare --check --workspace
         language: system
         pass_filenames: false
         always_run: true

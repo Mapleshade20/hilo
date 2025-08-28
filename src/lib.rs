@@ -27,7 +27,7 @@ use sqlx::PgPool;
 use tracing::info;
 
 use crate::handlers::{
-    get_profile, health_check, refresh_token, send_verification_code, verify_code,
+    get_profile, health_check, refresh_token, send_verification_code, upload_card, verify_code,
 };
 use crate::middleware::auth_middleware;
 use crate::services::email::{EmailService, ExternalEmailer, LogEmailer};
@@ -113,6 +113,7 @@ pub fn app_with_email_service(
 
     let protected_routes = Router::new()
         .route("/api/profile", get(get_profile))
+        .route("/api/upload-card", post(upload_card))
         .route_layer(from_fn_with_state(Arc::clone(&state), auth_middleware));
 
     let public_routes = Router::new()
