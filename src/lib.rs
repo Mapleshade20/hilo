@@ -18,6 +18,7 @@ use std::sync::Arc;
 
 use axum::{
     Router,
+    middleware::from_fn_with_state,
     routing::{get, post},
 };
 use jsonwebtoken::{DecodingKey, EncodingKey};
@@ -25,7 +26,10 @@ use secrecy::{ExposeSecret, SecretSlice};
 use sqlx::PgPool;
 use tracing::info;
 
-use crate::handlers::{health_check, refresh_token, send_verification_code, verify_code};
+use crate::handlers::{
+    get_profile, health_check, refresh_token, send_verification_code, verify_code,
+};
+use crate::middleware::auth_middleware;
 use crate::services::email::{EmailService, ExternalEmailer, LogEmailer};
 use crate::services::jwt::JwtService;
 use crate::state::AppState;
@@ -96,8 +100,8 @@ pub fn app_with_email_service(
     );
 
     let state = Arc::new(AppState::new(email_service, db_pool, jwt_service));
-    let state_clone = Arc::clone(&state);
 
+    let state_clone = Arc::clone(&state);
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(CACHE_CLEANUP_INTERVAL);
         interval.tick().await; // first tick completes immediately
@@ -107,10 +111,18 @@ pub fn app_with_email_service(
         }
     });
 
-    Router::new()
+    let protected_routes = Router::new()
+        .route("/api/profile", get(get_profile))
+        .route_layer(from_fn_with_state(Arc::clone(&state), auth_middleware));
+
+    let public_routes = Router::new()
         .route("/health-check", get(health_check))
         .route("/api/auth/send-code", post(send_verification_code))
         .route("/api/auth/verify-code", post(verify_code))
-        .route("/api/auth/refresh", post(refresh_token))
+        .route("/api/auth/refresh", post(refresh_token));
+
+    Router::new()
+        .merge(public_routes)
+        .merge(protected_routes)
         .with_state(state)
 }

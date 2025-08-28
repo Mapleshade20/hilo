@@ -8,6 +8,8 @@ This is the backend of a social matching project. It authenticates male and fema
 - **Test all**: `cargo test`
 - **Test single**: `cargo test --test test_name`
 - **Migrations**: `sqlx migrate run`/`sqlx migrate revert` (requires `DATABASE_URL` env var set)
+- **Sqlx offline prepare**: `cargo sqlx prepare -- --all-targets`
+- **Start postgres**: `podman machine start` (only needed on MacOS) -> `podman-compose up -d db`
 
 ## Code Style
 

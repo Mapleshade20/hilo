@@ -3,7 +3,9 @@
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
+use hilo::handlers::AuthResponse;
 use hilo::services::email::{EmailError, EmailService};
+use serde_json::json;
 use sqlx::PgPool;
 use tokio::net::TcpListener;
 
@@ -103,4 +105,45 @@ pub async fn spawn_app(test_db_pool: PgPool) -> (String, Arc<MockEmailer>) {
     }
 
     (address, mock_emailer)
+}
+
+// Helper function to extract verification code from email body
+pub fn extract_verification_code(email_body: &str) -> &str {
+    // Extract 6-digit code from "Your verification code is: 123456"
+    email_body.trim_start_matches("Your verification code is: ")
+}
+
+/// Helper function to complete auth flow and return access token
+pub async fn get_access_token(
+    client: &reqwest::Client,
+    address: &str,
+    mock_emailer: &Arc<MockEmailer>,
+    email_addr: &str,
+) -> String {
+    mock_emailer.clear();
+
+    // Send verification code
+    let response = client
+        .post(format!("{address}/api/auth/send-code"))
+        .json(&json!({"email": email_addr}))
+        .send()
+        .await
+        .expect("Failed to send code");
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+
+    // Extract code from email
+    let sent_email = mock_emailer.last_sent_email().expect("No email sent");
+    let code = extract_verification_code(&sent_email.body_html);
+
+    // Verify code and get tokens
+    let response = client
+        .post(format!("{address}/api/auth/verify-code"))
+        .json(&json!({"email": email_addr, "code": code}))
+        .send()
+        .await
+        .expect("Failed to verify code");
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+
+    let auth_response: AuthResponse = response.json().await.expect("Failed to parse response");
+    auth_response.access_token
 }

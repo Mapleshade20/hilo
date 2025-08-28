@@ -3,6 +3,8 @@
 //! This module contains middleware functions that handle cross-cutting concerns
 //! such as authentication, authorization, and request processing.
 
+use std::sync::Arc;
+
 use axum::{
     extract::{Request, State},
     http::{StatusCode, header},
@@ -40,7 +42,7 @@ use crate::{services::jwt::Claims, state::AppState};
     )
 )]
 pub async fn auth_middleware(
-    State(state): State<AppState>,
+    State(state): State<Arc<AppState>>,
     mut req: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
