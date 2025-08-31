@@ -11,10 +11,11 @@ use axum::{
     middleware::Next,
     response::Response,
 };
-use tracing::{debug, error, instrument, warn};
+use tracing::{debug, error, instrument, trace, warn};
 use uuid::Uuid;
 
-use crate::{services::jwt::Claims, state::AppState};
+use crate::models::AppState;
+use crate::services::jwt::Claims;
 
 /// Authentication middleware for protecting routes
 ///
@@ -34,7 +35,7 @@ use crate::{services::jwt::Claims, state::AppState};
 /// - **Success**: Continues to next handler with user context
 /// - **Failure**: Returns `401 Unauthorized` for invalid/missing tokens
 #[instrument(
-    skip(state, req, next),
+    skip_all,
     fields(
         method = %req.method(),
         uri = %req.uri(),
@@ -64,11 +65,11 @@ pub async fn auth_middleware(
     }
 
     let token = auth_header.trim_start_matches("Bearer ");
-    debug!("Extracted bearer token from Authorization header");
+    trace!("Extracted bearer token from Authorization header");
 
     match state.jwt_service.validate_access_token(token) {
         Ok(claims) => {
-            let user_id = claims.sub.parse::<Uuid>().map_err(|e| {
+            let user_id = uuid::Uuid::try_parse(&claims.sub).map_err(|e| {
                 error!(error = %e, "Failed to parse user ID from token claims");
                 StatusCode::UNAUTHORIZED
             })?;

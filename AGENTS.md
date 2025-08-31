@@ -1,23 +1,25 @@
-# Agent Guidelines for Hilo Project
+# Agent Guidelines
 
 ## Build/Test Commands
 
-- **Build**: `cargo build` (only in debug profile, do not build release)
+- **Build**: `cargo build` (only in debug profile, do not build release!)
 - **Test all**: `cargo test`
 - **Test single**: `cargo test --test test_name`
-- **Migrations**: `sqlx migrate run`/`sqlx migrate revert` (requires `DATABASE_URL` env var set)
+- **Migrations**: `sqlx migrate run` (requires `DATABASE_URL` env var set)
 - **SQLx offline prepare**: `cargo sqlx prepare -- --all-targets`
 - **Start postgres**: `podman machine start` (only needed on MacOS) -> `podman-compose up -d db`
 - **Reset postgres**: `podman-compose down -v`
 
 ## Code Style
 
+- Always read README first, then read other code in the same module before creating new child modules
 - Import standard library first, then external crates, then local modules
 - Use `tracing`, `tracing-subscriber` and `tracing-bunyan-formatter` for telemetry instead of println, log, or tracing-log
 - Constants go in `utils/constant.rs`, use `constant::*` to import; major configurable values go in `.env`
 - Use `thiserror` for custom error types
 - Postgres database queries use sqlx macros for compile-time checking
 - Make sure to follow good and idiomatic Rust coding style of the community
+- Use `AppState` or `std::sync::LazyLock` (or OnceLock if needed) for global objects
 
 ## Notes for integration tests
 

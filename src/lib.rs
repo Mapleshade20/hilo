@@ -1,4 +1,4 @@
-//! # Hilo - Social Matching Backend
+//! # Hilo - Social Pairing Backend
 //!
 //! ## Modules
 //!
@@ -9,8 +9,8 @@
 
 pub mod handlers;
 pub mod middleware;
+pub mod models;
 pub mod services;
-pub mod state;
 pub mod utils;
 
 use std::env;
@@ -27,12 +27,13 @@ use sqlx::PgPool;
 use tracing::info;
 
 use crate::handlers::{
-    get_profile, health_check, refresh_token, send_verification_code, upload_card, verify_code,
+    get_form, get_profile, health_check, refresh_token, send_verification_code, submit_form,
+    upload_card, upload_profile_photo, verify_code,
 };
 use crate::middleware::auth_middleware;
+use crate::models::{AppState, TagSystem};
 use crate::services::email::{EmailService, ExternalEmailer, LogEmailer};
 use crate::services::jwt::JwtService;
-use crate::state::AppState;
 use crate::utils::constant::*;
 
 /// Creates an Axum router with default email service configuration.
@@ -99,7 +100,15 @@ pub fn app_with_email_service(
         DecodingKey::from_secret(jwt_keys.expose_secret()),
     );
 
-    let state = Arc::new(AppState::new(email_service, db_pool, jwt_service));
+    let tag_system =
+        TagSystem::from_json("tags.json").expect("Failed to load tag system from tags.json");
+
+    let state = Arc::new(AppState::new(
+        email_service,
+        db_pool,
+        jwt_service,
+        tag_system,
+    ));
 
     let state_clone = Arc::clone(&state);
     tokio::spawn(async move {
@@ -113,7 +122,10 @@ pub fn app_with_email_service(
 
     let protected_routes = Router::new()
         .route("/api/profile", get(get_profile))
-        .route("/api/upload-card", post(upload_card))
+        .route("/api/form", post(submit_form))
+        .route("/api/form", get(get_form))
+        .route("/api/upload/card", post(upload_card))
+        .route("/api/upload/profile-photo", post(upload_profile_photo))
         .route_layer(from_fn_with_state(Arc::clone(&state), auth_middleware));
 
     let public_routes = Router::new()

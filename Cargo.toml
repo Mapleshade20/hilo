@@ -43,7 +43,7 @@ tracing-subscriber = { version = "0.3", features = [
     "json",
 ] }
 tracing-bunyan-formatter = "0.3"
-uuid = { version = "1.0", features = ["v4"] }
+uuid = { version = "1.0", features = ["v4", "serde"] }
 validator = { version = "0.20", features = ["derive"] }
 
 [dev-dependencies]

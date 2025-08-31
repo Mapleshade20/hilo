@@ -23,7 +23,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, instrument, warn};
 use validator::Validate;
 
-use crate::state::AppState;
+use crate::models::AppState;
 use crate::utils::{constant::*, validator::EMAIL_REGEX};
 
 /// Request payload for sending verification code to email
@@ -73,7 +73,7 @@ pub struct RefreshTokenRequest {
 /// - `429 Too Many Requests` - Rate limit exceeded
 /// - `500 Internal Server Error` - Email service failure
 #[instrument(
-    skip(state, payload),
+    skip_all,
     fields(
         email = %payload.email,
         request_id = %uuid::Uuid::new_v4()
@@ -159,7 +159,7 @@ pub async fn send_verification_code(
 /// - `400 Bad Request` - Invalid input or expired/invalid code
 /// - `500 Internal Server Error` - Database or token generation failure
 #[instrument(
-    skip(state, payload),
+    skip_all,
     fields(
         email = %payload.email,
         request_id = %uuid::Uuid::new_v4()
@@ -270,7 +270,7 @@ pub async fn verify_code(
 ///
 /// - `200 OK` - New token pair issued successfully
 /// - `401 Unauthorized` - Invalid or expired refresh token
-#[instrument(skip(state, payload), fields(request_id = %uuid::Uuid::new_v4()))]
+#[instrument(skip_all, fields(request_id = %uuid::Uuid::new_v4()))]
 pub async fn refresh_token(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<RefreshTokenRequest>,

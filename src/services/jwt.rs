@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 use thiserror::Error;
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{debug, error, instrument, trace, warn};
 use uuid::Uuid;
 
 use crate::utils::constant::*;
@@ -103,13 +103,13 @@ impl JwtService {
     /// # Errors
     ///
     /// Returns [`JwtError`] if token creation or database storage fails.
-    #[instrument(skip(self, db_pool), fields(user_id = %user_id))]
+    #[instrument(skip(self, db_pool))]
     pub async fn create_token_pair(
         &self,
         user_id: Uuid,
         db_pool: &PgPool,
     ) -> Result<TokenPair, JwtError> {
-        debug!("Creating new token pair");
+        trace!("Creating new token pair");
 
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -121,19 +121,19 @@ impl JwtService {
 
         // Create access token
         let access_claims = Claims {
-            sub: user_id.as_simple().to_string(),
+            sub: user_id.to_string(),
             exp: access_token_exp,
             iat: now,
         };
         let access_token = encode(&Header::default(), &access_claims, &self.encoding_key)?;
-        debug!("Access token created");
+        trace!("Access token created");
 
         // Create refresh token
         let refresh_token = Uuid::new_v4().to_string();
         let mut hasher = Sha256::new();
         hasher.update(refresh_token.as_bytes());
         let refresh_token_hash = format!("{:x}", hasher.finalize());
-        debug!("Refresh token generated and hashed");
+        trace!("Refresh token generated and hashed");
 
         // Store refresh token in database
         match sqlx::query!(
@@ -149,7 +149,7 @@ impl JwtService {
         .await
         {
             Ok(_) => {
-                debug!("Refresh token stored in database");
+                trace!("Refresh token stored in database");
             }
             Err(e) => {
                 error!(error = %e, "Failed to store refresh token in database");
@@ -181,13 +181,13 @@ impl JwtService {
     ///
     /// - [`JwtError::TokenExpired`] - Token has expired
     /// - [`JwtError::InvalidToken`] - Token is malformed or has invalid signature
-    #[instrument(skip(self, token), fields(token_length = token.len()))]
+    #[instrument(skip_all, fields(token_length = token.len()))]
     pub fn validate_access_token(&self, token: &str) -> Result<Claims, JwtError> {
-        debug!("Validating access token");
+        trace!("Validating access token");
 
         match decode::<Claims>(token, &self.decoding_key, &Validation::default()) {
             Ok(token_data) => {
-                debug!(user_id = %token_data.claims.sub, "Access token validated successfully");
+                trace!(user_id = %token_data.claims.sub, "Access token validated successfully");
                 Ok(token_data.claims)
             }
             Err(e) if e.kind() == &jsonwebtoken::errors::ErrorKind::ExpiredSignature => {
@@ -219,13 +219,13 @@ impl JwtService {
     ///
     /// - [`JwtError::RefreshTokenNotFound`] - Token not found or expired
     /// - [`JwtError::DatabaseError`] - Database operation failed
-    #[instrument(skip(self, refresh_token, db_pool), fields(token_length = refresh_token.len()))]
+    #[instrument(skip_all, fields(token_length = refresh_token.len()))]
     pub async fn refresh_token_pair(
         &self,
         refresh_token: &str,
         db_pool: &PgPool,
     ) -> Result<TokenPair, JwtError> {
-        debug!("Processing token refresh");
+        trace!("Processing token refresh");
 
         let mut hasher = Sha256::new();
         hasher.update(refresh_token.as_bytes());
@@ -252,7 +252,7 @@ impl JwtService {
 
         let token_record = match token_record {
             Some(record) => {
-                debug!(user_id = %record.user_id, "Refresh token found and valid");
+                trace!(user_id = %record.user_id, "Refresh token found and valid");
                 record
             }
             None => {
@@ -269,7 +269,7 @@ impl JwtService {
         .execute(db_pool)
         .await
         {
-            Ok(_) => debug!("Old refresh token deleted"),
+            Ok(_) => trace!("Old refresh token deleted"),
             Err(e) => {
                 error!(error = %e, "Failed to delete old refresh token");
                 return Err(JwtError::DatabaseError(e));
@@ -277,7 +277,7 @@ impl JwtService {
         }
 
         // Create new token pair
-        info!(user_id = %token_record.user_id, "Creating new token pair for refresh");
+        trace!(user_id = %token_record.user_id, "Creating new token pair for refresh");
         self.create_token_pair(token_record.user_id, db_pool).await
     }
 
@@ -294,7 +294,7 @@ impl JwtService {
     /// # Errors
     ///
     /// Returns [`JwtError::DatabaseError`] if the database operation fails.
-    #[instrument(skip(self, refresh_token, db_pool), fields(token_length = refresh_token.len()))]
+    #[instrument(skip_all, fields(token_length = refresh_token.len()))]
     pub async fn revoke_refresh_token(
         &self,
         refresh_token: &str,
@@ -315,7 +315,7 @@ impl JwtService {
         {
             Ok(result) => {
                 if result.rows_affected() > 0 {
-                    info!("Refresh token revoked successfully");
+                    debug!("Refresh token revoked successfully");
                 } else {
                     debug!("Refresh token not found for revocation");
                 }
@@ -342,7 +342,7 @@ impl JwtService {
     /// # Errors
     ///
     /// Returns [`JwtError::DatabaseError`] if the database operation fails.
-    #[instrument(skip(self, db_pool), fields(user_id = %user_id))]
+    #[instrument(skip(self, db_pool))]
     pub async fn revoke_user_refresh_token(
         &self,
         user_id: Uuid,
@@ -355,7 +355,7 @@ impl JwtService {
             .await
         {
             Ok(result) => {
-                info!(
+                debug!(
                     tokens_revoked = result.rows_affected(),
                     "All refresh tokens revoked for user"
                 );

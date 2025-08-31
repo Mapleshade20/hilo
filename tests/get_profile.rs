@@ -2,7 +2,7 @@ mod common;
 
 use common::{get_access_token, spawn_app};
 use hilo::handlers::ProfileResponse;
-use hilo::utils::user_status::UserStatus;
+use hilo::models::UserStatus;
 use sqlx::PgPool;
 
 #[sqlx::test]
@@ -27,6 +27,7 @@ async fn test_profile_with_valid_token(pool: PgPool) {
     let profile: ProfileResponse = response.json().await.expect("Failed to parse response");
     assert_eq!(profile.email, test_email);
     assert_eq!(profile.status, UserStatus::Unverified);
+    assert_eq!(profile.grade, None);
 }
 
 #[sqlx::test]
@@ -45,29 +46,13 @@ async fn test_profile_without_token(pool: PgPool) {
 }
 
 #[sqlx::test]
-async fn test_profile_with_invalid_token(pool: PgPool) {
-    let (address, _) = spawn_app(pool).await;
-    let client = reqwest::Client::new();
-
-    // Try to access profile endpoint with invalid token
-    let response = client
-        .get(format!("{}/api/profile", &address))
-        .header("Authorization", "Bearer invalid-token")
-        .send()
-        .await
-        .expect("Failed to execute request");
-
-    assert_eq!(response.status(), reqwest::StatusCode::UNAUTHORIZED);
-}
-
-#[sqlx::test]
 async fn test_profile_with_malformed_authorization_header(pool: PgPool) {
     let (address, _) = spawn_app(pool).await;
     let client = reqwest::Client::new();
 
     let test_cases = vec![
         ("Bearer", "Missing token after Bearer"),
-        ("Basic token123", "Wrong auth type"),
+        ("Bearer something", "Invalid token"),
         ("token123", "Missing Bearer prefix"),
         ("", "Empty header"),
     ];
@@ -115,5 +100,6 @@ async fn test_profile_multiple_users(pool: PgPool) {
         let profile: ProfileResponse = response.json().await.expect("Failed to parse response");
         assert_eq!(profile.email, *email);
         assert_eq!(profile.status, UserStatus::Unverified);
+        assert_eq!(profile.grade, None);
     }
 }

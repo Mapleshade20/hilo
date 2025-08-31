@@ -1,5 +1,4 @@
 -- Add up migration script here
--- Add migration script here
 CREATE TYPE user_status AS ENUM (
     'unverified',               -- email verified, but card not verified
     'verification_pending',     -- email verified, card photo uploaded, awaiting admin verification
@@ -15,7 +14,8 @@ CREATE TABLE users (
     email VARCHAR(255) UNIQUE NOT NULL,
     status user_status NOT NULL DEFAULT 'unverified',
     wechat_id VARCHAR(100),
-    card_photo_path VARCHAR(500),
+    card_photo_path VARCHAR(255),
+    grade VARCHAR(50),
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

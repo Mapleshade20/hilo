@@ -4,6 +4,7 @@
 //! user_status enum type in the database. Using a Rust enum provides better
 //! performance compared to text conversion and ensures type safety.
 
+use axum::response::IntoResponse;
 use serde::{Deserialize, Serialize};
 
 /// Represents the possible status values for a user in the system.
@@ -56,11 +57,20 @@ impl std::fmt::Display for UserStatus {
 impl UserStatus {
     /// Returns true if the user is allowed to upload a card photo.
     /// Only unverified users can upload cards.
+    #[inline]
     pub fn can_upload_card(&self) -> bool {
         matches!(self, UserStatus::Unverified)
     }
 
+    /// Returns true if the user is allowed to fill a form or upload a profile photo.
+    /// Only verified and form_completed users can do such things.
+    #[inline]
+    pub fn can_fill_form(&self) -> bool {
+        matches!(self, UserStatus::Verified | UserStatus::FormCompleted)
+    }
+
     /// Returns true if the user has completed card verification.
+    #[inline]
     pub fn is_card_verified(&self) -> bool {
         matches!(
             self,
@@ -69,5 +79,25 @@ impl UserStatus {
                 | UserStatus::Matched
                 | UserStatus::Confirmed
         )
+    }
+
+    /// Queries the database for the user's status by their user ID.
+    pub async fn query(
+        db_pool: &sqlx::PgPool,
+        user_id: &uuid::Uuid,
+    ) -> Result<Self, impl IntoResponse> {
+        use axum::http::StatusCode;
+        let user_status_result = sqlx::query!(
+            r#"SELECT status as "status: UserStatus" FROM users WHERE id = $1"#,
+            user_id
+        )
+        .fetch_optional(db_pool)
+        .await;
+
+        match user_status_result {
+            Ok(Some(row)) => Ok(row.status),
+            Ok(None) => Err((StatusCode::NOT_FOUND, "User not found")),
+            Err(_) => Err((StatusCode::INTERNAL_SERVER_ERROR, "Database error")),
+        }
     }
 }

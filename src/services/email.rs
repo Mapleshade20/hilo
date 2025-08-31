@@ -63,7 +63,7 @@ pub struct LogEmailer;
 
 #[async_trait]
 impl EmailService for LogEmailer {
-    #[instrument(skip(self, body_html), fields(recipient = %recipient, subject = %subject))]
+    #[instrument(skip(self, body_html))]
     async fn send_email(
         &self,
         recipient: &str,
@@ -131,8 +131,6 @@ impl EmailService for ExternalEmailer {
     #[instrument(
         skip(self, body_html),
         fields(
-            recipient = %recipient,
-            subject = %subject,
             sender = %self.sender_email
         )
     )]

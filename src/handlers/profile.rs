@@ -14,13 +14,15 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, instrument};
 
-use crate::{middleware::AuthUser, state::AppState, utils::user_status::UserStatus};
+use crate::middleware::AuthUser;
+use crate::models::{AppState, UserStatus};
 
 /// Response containing user profile information
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProfileResponse {
     pub email: String,
     pub status: UserStatus,
+    pub grade: Option<String>,
 }
 
 /// Gets the authenticated user's profile information.
@@ -36,7 +38,7 @@ pub struct ProfileResponse {
 /// - `404 Not Found` - User not found in database
 /// - `500 Internal Server Error` - Database error
 #[instrument(
-    skip(state),
+    skip_all,
     fields(
         user_id = %user.user_id,
         request_id = %uuid::Uuid::new_v4()
@@ -50,7 +52,7 @@ pub async fn get_profile(
 
     // Query user profile from database
     let result = sqlx::query!(
-        "SELECT email, status as \"status: UserStatus\" FROM users WHERE id = $1",
+        r#"SELECT email, status as "status: UserStatus", grade FROM users WHERE id = $1"#,
         user.user_id
     )
     .fetch_optional(&state.db_pool)
@@ -64,6 +66,7 @@ pub async fn get_profile(
                 Json(ProfileResponse {
                     email: row.email,
                     status: row.status,
+                    grade: row.grade,
                 }),
             )
                 .into_response()

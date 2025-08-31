@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT email, status as \"status: UserStatus\" FROM users WHERE id = $1",
+  "query": "SELECT email, status as \"status: UserStatus\", grade FROM users WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -26,6 +26,11 @@
             }
           }
         }
+      },
+      {
+        "ordinal": 2,
+        "name": "grade",
+        "type_info": "Varchar"
       }
     ],
     "parameters": {
@@ -35,8 +40,9 @@
     },
     "nullable": [
       false,
-      false
+      false,
+      true
     ]
   },
-  "hash": "5580f8f572fd93f4641c87de41f9938ccc15b40a29a4e3b9c876d077e16c53cb"
+  "hash": "a6dc9f388ca3c2507c9476353273c1a5d517ee3424e89754d9eb1aef0a98d1c3"
 }

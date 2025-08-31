@@ -5,8 +5,8 @@ use dashmap::DashMap;
 use sqlx::PgPool;
 use tracing::{debug, info, instrument};
 
-use crate::services::email::EmailService;
-use crate::services::jwt::JwtService;
+use crate::models::TagSystem;
+use crate::services::{email::EmailService, jwt::JwtService};
 use crate::utils::constant::*;
 
 /// Application state shared across requests. Needs to be thread-safe.
@@ -21,6 +21,8 @@ pub struct AppState {
     pub db_pool: PgPool,
     /// JWT service for token generation and validation.
     pub jwt_service: JwtService,
+    /// Tag system for tag validation and hierarchy processing.
+    pub tag_system: TagSystem,
 }
 
 impl AppState {
@@ -31,11 +33,12 @@ impl AppState {
     /// * `email_service` - Service for sending verification emails
     /// * `db_pool` - PostgreSQL database connection pool
     /// * `jwt_service` - Service for JWT token operations
-    #[instrument(skip(email_service, db_pool, jwt_service))]
+    /// * `tag_system` - Tag system for validation and hierarchy processing
     pub fn new(
         email_service: Arc<dyn EmailService>,
         db_pool: PgPool,
         jwt_service: JwtService,
+        tag_system: TagSystem,
     ) -> Self {
         info!("Initializing application state");
         debug!(
@@ -49,6 +52,7 @@ impl AppState {
             email_service,
             db_pool,
             jwt_service,
+            tag_system,
         }
     }
 
@@ -56,14 +60,14 @@ impl AppState {
     ///
     /// This method is called periodically to prevent memory leaks from expired entries.
     /// Only performs cleanup when cache size exceeds the configured capacity.
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub fn cleanup_expired_entries(&self) {
         let verification_cache_size = self.verification_code_cache.len();
         let rate_limit_cache_size = self.rate_limit_cache.len();
 
         debug!(
-            verification_cache_size = verification_cache_size,
-            rate_limit_cache_size = rate_limit_cache_size,
+            verification_cache_size,
+            rate_limit_cache_size,
             cache_capacity = CACHE_CAPACITY,
             "Checking if cache cleanup is needed"
         );
@@ -75,8 +79,8 @@ impl AppState {
             let final_size = self.verification_code_cache.len();
 
             info!(
-                initial_size = initial_size,
-                final_size = final_size,
+                initial_size,
+                final_size,
                 removed = initial_size - final_size,
                 "Cleaned up expired verification code entries"
             );
@@ -89,8 +93,8 @@ impl AppState {
             let final_size = self.rate_limit_cache.len();
 
             info!(
-                initial_size = initial_size,
-                final_size = final_size,
+                initial_size,
+                final_size,
                 removed = initial_size - final_size,
                 "Cleaned up expired rate limit entries"
             );
