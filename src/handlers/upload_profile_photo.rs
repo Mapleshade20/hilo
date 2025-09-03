@@ -13,7 +13,6 @@
 //! Files are stored in `UPLOAD_DIR/profile_photos/{user_uuid}.{ext}`
 //! The file path is returned in the JSON response but NOT stored in the database.
 
-use std::env;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -28,6 +27,7 @@ use tracing::{debug, error, info, instrument, trace, warn};
 
 use crate::middleware::AuthUser;
 use crate::models::{AppState, UserStatus};
+use crate::utils::static_object::UPLOAD_DIR;
 use crate::utils::upload::{FileManager, ImageUploadValidator};
 
 /// Response structure for successful profile photo upload.
@@ -37,6 +37,8 @@ struct UploadProfilePhotoResponse {
 }
 
 /// Uploads a profile photo for verified users.
+///
+/// POST /api/upload/profile-photo MultipartForm
 ///
 /// This endpoint accepts multipart/form-data with an image file and stores it
 /// for the user's profile. Only users with 'verified' or 'form_completed' status
@@ -141,8 +143,7 @@ pub async fn upload_profile_photo(
     trace!(format = ?image_format, size = file_data.len(), "Image validation passed");
 
     // 7. Prepare file storage
-    let upload_dir = env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
-    let profile_photos_dir = Path::new(&upload_dir).join("profile_photos");
+    let profile_photos_dir = Path::new(UPLOAD_DIR.as_str()).join("profile_photos");
 
     // Create directory if it doesn't exist
     if let Err(e) = FileManager::ensure_directory_exists(&profile_photos_dir).await {
@@ -151,7 +152,7 @@ pub async fn upload_profile_photo(
     }
 
     // 8. Generate file path
-    let filename = FileManager::generate_user_filename(user.user_id, &file_extension);
+    let filename = FileManager::generate_user_filename(user.user_id, file_extension);
     let file_path = profile_photos_dir.join(&filename);
 
     debug!(file_path = %file_path.display(), "Saving profile photo");

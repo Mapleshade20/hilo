@@ -8,17 +8,13 @@
 //!
 //! - [`LogEmailer`] - Development/testing implementation that logs emails to console
 //! - [`ExternalEmailer`] - Production implementation using external email API
-//!
-//! ## Usage
-//!
-//! The email service is automatically configured based on the `APP_ENV` environment variable:
-//! - **Production**: Uses `ExternalEmailer` with real email API
-//! - **Development/Testing**: Uses `LogEmailer` for console output
 
 use async_trait::async_trait;
 use serde_json::json;
 use thiserror::Error;
 use tracing::{debug, error, info, instrument};
+
+use crate::utils::html::generate_verification_email_html;
 
 /// Errors that can occur during email operations
 #[derive(Debug, Error)]
@@ -40,7 +36,7 @@ pub trait EmailService: Send + Sync {
     ///
     /// * `recipient` - Email address of the recipient
     /// * `subject` - Email subject line
-    /// * `body_html` - HTML content of the email body
+    /// * `core` - The most essential field; structs implementing this trait should format it
     ///
     /// # Errors
     ///
@@ -50,7 +46,7 @@ pub trait EmailService: Send + Sync {
         &self,
         recipient: &str,
         subject: &str,
-        body_html: &str,
+        core: &str,
     ) -> Result<(), EmailError>;
 }
 
@@ -63,12 +59,12 @@ pub struct LogEmailer;
 
 #[async_trait]
 impl EmailService for LogEmailer {
-    #[instrument(skip(self, body_html))]
+    #[instrument(skip(self, code))]
     async fn send_email(
         &self,
         recipient: &str,
         subject: &str,
-        body_html: &str,
+        code: &str,
     ) -> Result<(), EmailError> {
         info!("Sending mock email");
 
@@ -76,7 +72,7 @@ impl EmailService for LogEmailer {
         println!("To: {recipient}");
         println!("Subject: {subject}");
         println!("-----------------------------");
-        println!("{body_html}");
+        println!("Your verification code is: {code}");
         println!("=============================");
 
         debug!("Mock email logged to console");
@@ -129,7 +125,7 @@ impl ExternalEmailer {
 #[async_trait]
 impl EmailService for ExternalEmailer {
     #[instrument(
-        skip(self, body_html),
+        skip(self, code),
         fields(
             sender = %self.sender_email
         )
@@ -138,7 +134,7 @@ impl EmailService for ExternalEmailer {
         &self,
         recipient: &str,
         subject: &str,
-        body_html: &str,
+        code: &str,
     ) -> Result<(), EmailError> {
         debug!("Preparing to send email via external API");
 
@@ -146,7 +142,7 @@ impl EmailService for ExternalEmailer {
             "to": recipient,
             "from": self.sender_email,
             "subject": subject,
-            "content": [{ "type": "text/html", "value": body_html }]
+            "content": [{ "type": "text/html", "value": generate_verification_email_html(code) }]
         });
 
         debug!("Sending HTTP request to email API");

@@ -43,7 +43,7 @@ impl ImageUploadValidator {
     ///
     /// * `Ok((extension, format))` - Valid image with file extension and ImageFormat
     /// * `Err(String)` - Invalid image format with error message
-    pub fn validate_image_format(data: &[u8]) -> Result<(String, ImageFormat), String> {
+    pub fn validate_image_format(data: &[u8]) -> Result<(&'static str, ImageFormat), String> {
         let image_format =
             image::guess_format(data).map_err(|e| format!("Could not detect image format: {e}"))?;
 
@@ -60,8 +60,8 @@ impl ImageUploadValidator {
             ));
         }
 
-        debug!(format = ?image_format, extension = file_extension, "Image format validated");
-        Ok((file_extension.to_string(), image_format))
+        trace!(format = ?image_format, extension = file_extension, "Image format validated");
+        Ok((file_extension, image_format))
     }
 
     /// Validates that the file is not empty.
@@ -74,9 +74,9 @@ impl ImageUploadValidator {
     ///
     /// * `Ok(())` - File has content
     /// * `Err(String)` - File is empty with error message
-    pub fn validate_file_not_empty(data: &[u8]) -> Result<(), String> {
+    pub fn validate_file_not_empty(data: &[u8]) -> Result<(), &'static str> {
         if data.is_empty() {
-            return Err("Empty file not allowed".to_string());
+            return Err("Empty file not allowed");
         }
         Ok(())
     }

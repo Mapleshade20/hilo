@@ -22,7 +22,7 @@ pub struct AppState {
     /// JWT service for token generation and validation.
     pub jwt_service: JwtService,
     /// Tag system for tag validation and hierarchy processing.
-    pub tag_system: TagSystem,
+    pub tag_system: &'static TagSystem,
 }
 
 impl AppState {
@@ -38,7 +38,7 @@ impl AppState {
         email_service: Arc<dyn EmailService>,
         db_pool: PgPool,
         jwt_service: JwtService,
-        tag_system: TagSystem,
+        tag_system: &'static TagSystem,
     ) -> Self {
         info!("Initializing application state");
         debug!(

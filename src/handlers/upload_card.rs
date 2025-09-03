@@ -8,7 +8,6 @@
 //! 3. Files are stored in the filesystem with secure naming
 //! 4. Database is updated with the file path for admin review
 
-use std::env;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -21,13 +20,16 @@ use tracing::{debug, error, info, instrument, trace, warn};
 
 use crate::middleware::AuthUser;
 use crate::models::{AppState, UserStatus};
+use crate::utils::static_object::{ALLOWED_GRADES, UPLOAD_DIR};
 use crate::utils::upload::{FileManager, ImageUploadValidator};
-use crate::utils::validator;
 
-/// Uploads a student card image for verification.
+/// Uploads a student card for verification.
 ///
-/// This endpoint accepts multipart/form-data with an image file and stores it
-/// for admin verification. Only users with 'unverified' status can upload cards.
+/// POST /api/upload/card MultipartForm
+///
+/// This endpoint accepts multipart/form-data with a `card` image field and a
+/// `grade` text field, and stores it for admin verification. Only users with
+/// 'unverified' status can upload cards.
 ///
 /// # Security & Validation
 ///
@@ -112,7 +114,7 @@ pub async fn upload_card(
                 });
             }
             "grade" => {
-                let grade_text = match field.text().await {
+                let grade_local = match field.text().await {
                     Ok(text) => text,
                     Err(e) => {
                         error!(error = %e, "Error reading grade field");
@@ -121,12 +123,12 @@ pub async fn upload_card(
                 };
 
                 // Validate grade
-                if let Err(e) = validator::validate_grade(&grade_text) {
-                    warn!(grade = %grade_text, error = %e, "Invalid grade");
-                    return (StatusCode::BAD_REQUEST, e).into_response();
+                if !ALLOWED_GRADES.contains(&grade_local.as_str()) {
+                    warn!(grade = %grade_local, "Invalid grade");
+                    return (StatusCode::BAD_REQUEST, "Error reading grade").into_response();
                 }
 
-                grade = Some(grade_text);
+                grade = Some(grade_local);
             }
             _ => {
                 warn!(field_name = %field_name, "Unknown field in multipart form");
@@ -170,15 +172,14 @@ pub async fn upload_card(
     trace!(format = ?image_format, size = file_data.len(), "Image validation passed");
 
     // 6. Prepare file storage
-    let upload_dir = env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
-    let card_photos_dir = Path::new(&upload_dir).join("card_photos");
+    let card_photos_dir = Path::new(UPLOAD_DIR.as_str()).join("card_photos");
 
     // Create directory if it doesn't exist
     if let Err(e) = FileManager::ensure_directory_exists(&card_photos_dir).await {
         error!(error = %e, "Failed to create upload directory");
         return (StatusCode::INTERNAL_SERVER_ERROR, "File system error").into_response();
     }
-    let filename = FileManager::generate_user_filename(user.user_id, &file_extension);
+    let filename = FileManager::generate_user_filename(user.user_id, file_extension);
     let file_path = card_photos_dir.join(&filename);
 
     debug!(file_path = %file_path.display(), grade = %grade, "Saving file");

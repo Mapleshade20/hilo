@@ -5,7 +5,6 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use thiserror::Error;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TagNode {
@@ -17,16 +16,9 @@ pub struct TagNode {
     pub is_matchable: bool,
 }
 
-#[derive(Debug, Error)]
-pub enum TagSystemError {
-    #[error("Failed to read tags.json file: {0}")]
-    FileRead(#[from] std::io::Error),
-    #[error("Failed to parse tags.json: {0}")]
-    JsonParse(#[from] serde_json::Error),
-}
-
 /// A system to manage hierarchical tags, allowing for parent-child relationships,
 /// matchability checks, and ancestor retrieval.
+#[derive(Clone)]
 pub struct TagSystem {
     parent_map: HashMap<String, String>,
     matchable_map: HashMap<String, bool>,
@@ -34,9 +26,8 @@ pub struct TagSystem {
 
 impl TagSystem {
     /// Loads the tag system from a JSON file.
-    pub fn from_json(path: &str) -> Result<Self, TagSystemError> {
-        let content = std::fs::read_to_string(path)?;
-        let nodes: Vec<TagNode> = serde_json::from_str(&content)?;
+    pub fn from_json(content: &str) -> Result<Self, serde_json::Error> {
+        let nodes: Vec<TagNode> = serde_json::from_str(content)?;
 
         let mut parent_map = HashMap::new();
         let mut matchable_map = HashMap::new();

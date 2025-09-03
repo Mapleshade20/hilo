@@ -12,6 +12,7 @@ use axum::{
     response::IntoResponse,
 };
 use serde::{Deserialize, Serialize};
+use tokio::fs;
 use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 
@@ -34,6 +35,8 @@ pub struct FormRequest {
 }
 
 /// Submits or updates the authenticated user's form data.
+///
+/// POST /api/form FormRequest
 ///
 /// This endpoint validates the form data including tag limits and profile photo paths,
 /// then saves or updates the user's form in the database. Only users with 'verified'
@@ -79,7 +82,7 @@ pub async fn submit_form(
     }
 
     // 2. Validate each field of the form
-    if let Some(err_resp) = payload.validate_request(&state.tag_system) {
+    if let Some(err_resp) = payload.validate_request(state.tag_system) {
         return err_resp;
     }
 
@@ -106,8 +109,7 @@ pub async fn submit_form(
             ideal_traits = EXCLUDED.ideal_traits,
             physical_boundary = EXCLUDED.physical_boundary,
             self_intro = EXCLUDED.self_intro,
-            profile_photo_path = EXCLUDED.profile_photo_path,
-            updated_at = NOW()
+            profile_photo_path = EXCLUDED.profile_photo_path
         "#,
         user.user_id,
         payload.gender as Gender,
@@ -176,6 +178,8 @@ pub async fn submit_form(
 
 /// Retrieves the authenticated user's form data.
 ///
+/// GET /api/form
+///
 /// This endpoint returns the user's submitted form data. Only users with 'verified'
 /// or 'form_completed' status can access this endpoint.
 ///
@@ -232,7 +236,6 @@ async fn validate_profile_photo_path(
     full_path: &str,
     user_id: &Uuid,
 ) -> Result<(), impl IntoResponse> {
-    use std::path::Path;
     let photo_uuid = match upload::FileManager::parse_uuid_from_path(full_path) {
         Some(uuid) => uuid,
         None => {
@@ -249,7 +252,7 @@ async fn validate_profile_photo_path(
         return Err((StatusCode::BAD_REQUEST, "Photo UUID doesn't match user ID"));
     }
 
-    if !Path::new(full_path).exists() {
+    if !fs::try_exists(full_path).await.unwrap_or(false) {
         warn!("Profile photo file doesn't exist: {:?}", full_path);
         return Err((StatusCode::BAD_REQUEST, "Profile photo file doesn't exist"));
     }

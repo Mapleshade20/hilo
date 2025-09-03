@@ -9,8 +9,13 @@
 //! - `NO_COLOR` - If set, disables colored log output (optional)
 
 use std::env;
+use std::sync::LazyLock;
 
-use hilo::app;
+use hilo::{
+    app,
+    handlers::admin_router,
+    utils::static_object::{EMAIL_REGEX, TAG_SYSTEM},
+};
 use sqlx::PgPool;
 use tokio::net::TcpListener;
 use tracing::{info, instrument, warn};
@@ -25,7 +30,7 @@ async fn main() {
     // 1. Set up tracing subscriber for logging
     init_tracing();
 
-    // 2. Connect to PostgreSQL database and construct app
+    // 2. Connect to PostgreSQL database
     let db_pool = PgPool::connect(
         &env::var("DATABASE_URL").expect("Env variable `DATABASE_URL` should be set"),
     )
@@ -33,25 +38,55 @@ async fn main() {
     .expect("Failed to connect to Postgres");
 
     info!("Connected to PostgreSQL database");
-    let app = app(db_pool);
 
     // 3. Create a future that resolves on Ctrl+C
     let shutdown_signal = async {
         tokio::signal::ctrl_c()
             .await
             .expect("Failed to listen for ctrl_c signal");
-        info!("Ctrl+C received, shutting down");
+        info!("Ctrl+C received, shutting down both servers");
     };
 
-    // 4. Start server at specified address
-    let addr = env::var("ADDRESS").expect("Env variable `ADDRESS` should be set");
-    let listener = TcpListener::bind(&addr).await.unwrap();
-    info!("Server starting at http://{}", addr);
+    // 4. Start main server
+    LazyLock::force(&EMAIL_REGEX); // ensure panic happens at startup
+    LazyLock::force(&TAG_SYSTEM);
+    let main_db_pool = db_pool.clone();
+    let main_server = tokio::spawn(async move {
+        let app = app(main_db_pool);
+        let addr = env::var("ADDRESS").expect("Env variable `ADDRESS` should be set");
+        let listener = TcpListener::bind(&addr).await.unwrap();
+        info!("Main server starting at http://{}", addr);
 
-    axum::serve(listener, app.into_make_service())
-        .with_graceful_shutdown(shutdown_signal)
-        .await
-        .unwrap();
+        axum::serve(listener, app.into_make_service())
+            .await
+            .unwrap();
+    });
+
+    // 5. Start admin server
+    // Admin server is protected by Cloudflare Access, so no additional auth is needed
+    let admin_server = tokio::spawn(async move {
+        let app = admin_router(db_pool);
+        let addr = env::var("ADMIN_ADDRESS").expect("Env variable `ADMIN_ADDRESS` should be set");
+        let listener = TcpListener::bind(&addr).await.unwrap();
+        info!("Admin server starting at http://{}", addr);
+
+        axum::serve(listener, app.into_make_service())
+            .await
+            .unwrap();
+    });
+
+    // 6. Wait for either server to complete or shutdown signal
+    tokio::select! {
+        _ = main_server => {
+            warn!("Main server terminated unexpectedly");
+        }
+        _ = admin_server => {
+            warn!("Admin server terminated unexpectedly");
+        }
+        _ = shutdown_signal => {
+            info!("Graceful shutdown initiated");
+        }
+    }
 }
 
 /// Initialize tracing with environment-based configuration

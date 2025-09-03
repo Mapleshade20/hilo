@@ -27,6 +27,8 @@ pub struct ProfileResponse {
 
 /// Gets the authenticated user's profile information.
 ///
+/// GET /api/profile
+///
 /// This endpoint returns the user's email and current status from the database.
 /// It requires authentication via JWT token and uses the user ID from the token
 /// to fetch the most up-to-date profile information.

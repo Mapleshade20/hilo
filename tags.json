@@ -2,7 +2,7 @@
   {
     "id": "sports",
     "name": "运动/户外活动",
-    "is_matchable": false,
+    "is_matchable": true,
     "children": [
       {
         "id": "volleyball",
@@ -141,14 +141,14 @@
         "is_matchable": true
       },
       {
-        "id": "music",
+        "id": "music_games",
         "name": "音游",
         "desc": "音游人当然知道自己玩的是音游啦xD",
         "is_matchable": true
       },
       {
-        "id": "creative",
-        "name": "沙发联机/解谜/独立游戏",
+        "id": "creative_games",
+        "name": "沙发联机/派对/解谜/独立游戏",
         "desc": "大众的小众的都在这里! 双人成行, 胡闹厨房, Limbo, Undertale, Celeste, 小小梦魇...",
         "is_matchable": true
       }

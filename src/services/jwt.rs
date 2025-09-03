@@ -70,19 +70,22 @@ pub struct TokenPair {
 pub struct JwtService {
     encoding_key: EncodingKey,
     decoding_key: DecodingKey,
+    db_pool: PgPool,
 }
 
 impl JwtService {
-    /// Creates a new JWT service with the provided keys.
+    /// Creates a new JWT service with the provided keys and database pool.
     ///
     /// # Arguments
     ///
     /// * `encoding_key` - Key used for signing JWT tokens
     /// * `decoding_key` - Key used for verifying JWT tokens
-    pub fn new(encoding_key: EncodingKey, decoding_key: DecodingKey) -> Self {
+    /// * `db_pool` - Database connection pool for refresh token operations
+    pub fn new(encoding_key: EncodingKey, decoding_key: DecodingKey, db_pool: PgPool) -> Self {
         Self {
             encoding_key,
             decoding_key,
+            db_pool,
         }
     }
 
@@ -94,7 +97,6 @@ impl JwtService {
     /// # Arguments
     ///
     /// * `user_id` - Unique identifier for the user
-    /// * `db_pool` - Database connection pool for storing refresh token
     ///
     /// # Returns
     ///
@@ -103,12 +105,8 @@ impl JwtService {
     /// # Errors
     ///
     /// Returns [`JwtError`] if token creation or database storage fails.
-    #[instrument(skip(self, db_pool))]
-    pub async fn create_token_pair(
-        &self,
-        user_id: Uuid,
-        db_pool: &PgPool,
-    ) -> Result<TokenPair, JwtError> {
+    #[instrument(skip(self))]
+    pub async fn create_token_pair(&self, user_id: Uuid) -> Result<TokenPair, JwtError> {
         trace!("Creating new token pair");
 
         let now = SystemTime::now()
@@ -145,7 +143,7 @@ impl JwtService {
             refresh_token_hash,
             refresh_token_exp as i64
         )
-        .execute(db_pool)
+        .execute(&self.db_pool)
         .await
         {
             Ok(_) => {
@@ -209,7 +207,6 @@ impl JwtService {
     /// # Arguments
     ///
     /// * `refresh_token` - Current valid refresh token
-    /// * `db_pool` - Database connection pool for token validation and storage
     ///
     /// # Returns
     ///
@@ -220,11 +217,7 @@ impl JwtService {
     /// - [`JwtError::RefreshTokenNotFound`] - Token not found or expired
     /// - [`JwtError::DatabaseError`] - Database operation failed
     #[instrument(skip_all, fields(token_length = refresh_token.len()))]
-    pub async fn refresh_token_pair(
-        &self,
-        refresh_token: &str,
-        db_pool: &PgPool,
-    ) -> Result<TokenPair, JwtError> {
+    pub async fn refresh_token_pair(&self, refresh_token: &str) -> Result<TokenPair, JwtError> {
         trace!("Processing token refresh");
 
         let mut hasher = Sha256::new();
@@ -240,7 +233,7 @@ impl JwtService {
             "#,
             refresh_token_hash
         )
-        .fetch_optional(db_pool)
+        .fetch_optional(&self.db_pool)
         .await
         {
             Ok(record) => record,
@@ -266,7 +259,7 @@ impl JwtService {
             "DELETE FROM refresh_tokens WHERE token_hash = $1",
             refresh_token_hash
         )
-        .execute(db_pool)
+        .execute(&self.db_pool)
         .await
         {
             Ok(_) => trace!("Old refresh token deleted"),
@@ -278,7 +271,7 @@ impl JwtService {
 
         // Create new token pair
         trace!(user_id = %token_record.user_id, "Creating new token pair for refresh");
-        self.create_token_pair(token_record.user_id, db_pool).await
+        self.create_token_pair(token_record.user_id).await
     }
 
     /// Revokes a specific refresh token.
@@ -289,17 +282,12 @@ impl JwtService {
     /// # Arguments
     ///
     /// * `refresh_token` - Refresh token to revoke
-    /// * `db_pool` - Database connection pool
     ///
     /// # Errors
     ///
     /// Returns [`JwtError::DatabaseError`] if the database operation fails.
     #[instrument(skip_all, fields(token_length = refresh_token.len()))]
-    pub async fn revoke_refresh_token(
-        &self,
-        refresh_token: &str,
-        db_pool: &PgPool,
-    ) -> Result<(), JwtError> {
+    pub async fn revoke_refresh_token(&self, refresh_token: &str) -> Result<(), JwtError> {
         debug!("Revoking refresh token");
 
         let mut hasher = Sha256::new();
@@ -310,7 +298,7 @@ impl JwtService {
             "DELETE FROM refresh_tokens WHERE token_hash = $1",
             refresh_token_hash
         )
-        .execute(db_pool)
+        .execute(&self.db_pool)
         .await
         {
             Ok(result) => {
@@ -337,21 +325,16 @@ impl JwtService {
     /// # Arguments
     ///
     /// * `user_id` - User whose tokens should be revoked
-    /// * `db_pool` - Database connection pool
     ///
     /// # Errors
     ///
     /// Returns [`JwtError::DatabaseError`] if the database operation fails.
-    #[instrument(skip(self, db_pool))]
-    pub async fn revoke_user_refresh_token(
-        &self,
-        user_id: Uuid,
-        db_pool: &PgPool,
-    ) -> Result<(), JwtError> {
+    #[instrument(skip(self))]
+    pub async fn revoke_user_refresh_token(&self, user_id: Uuid) -> Result<(), JwtError> {
         debug!("Revoking all refresh tokens for user");
 
         match sqlx::query!("DELETE FROM refresh_tokens WHERE user_id = $1", user_id)
-            .execute(db_pool)
+            .execute(&self.db_pool)
             .await
         {
             Ok(result) => {

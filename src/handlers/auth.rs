@@ -10,6 +10,7 @@
 //!
 //! The email endpoint includes rate limiting and input validation for security.
 
+use std::borrow::Cow;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -24,7 +25,7 @@ use tracing::{debug, error, info, instrument, warn};
 use validator::Validate;
 
 use crate::models::AppState;
-use crate::utils::{constant::*, validator::EMAIL_REGEX};
+use crate::utils::{constant::*, static_object::EMAIL_REGEX};
 
 /// Request payload for sending verification code to email
 #[derive(Debug, Deserialize, Validate)]
@@ -47,7 +48,7 @@ pub struct VerifyRequest {
 pub struct AuthResponse {
     pub access_token: String,
     pub refresh_token: String,
-    pub token_type: String,
+    pub token_type: Cow<'static, str>,
     pub expires_in: u64,
 }
 
@@ -59,8 +60,7 @@ pub struct RefreshTokenRequest {
 
 /// Sends a verification code to the specified email address.
 ///
-/// This endpoint generates a 6-digit verification code and sends it via email.
-/// It includes rate limiting to prevent abuse and caches the code for later verification.
+/// POST /api/auth/send-code email=
 ///
 /// # Rate Limiting
 ///
@@ -96,10 +96,7 @@ pub async fn send_verification_code(
         && entry.elapsed() < EMAIL_RATE_LIMIT
     {
         let remaining = EMAIL_RATE_LIMIT - entry.elapsed();
-        let message = format!(
-            "Rate limit exceeded. Try again in {} seconds.",
-            remaining.as_secs()
-        );
+        let message = "Rate limit exceeded";
         warn!(
             remaining_seconds = remaining.as_secs(),
             "Rate limit exceeded for email"
@@ -123,11 +120,7 @@ pub async fn send_verification_code(
     // 5. Send email
     match state
         .email_service
-        .send_email(
-            &payload.email,
-            "Verification code",
-            &format!("Your verification code is: {code}"), // TODO: write good html
-        )
+        .send_email(&payload.email, "Verification code", &code)
         .await
     {
         Err(e) => {
@@ -142,6 +135,8 @@ pub async fn send_verification_code(
 }
 
 /// Verifies the email verification code and creates user account.
+///
+/// POST /api/auth/verify-code email= code=
 ///
 /// This endpoint validates the verification code sent to the user's email,
 /// creates or updates the user account in the database, and issues JWT tokens
@@ -220,11 +215,7 @@ pub async fn verify_code(
 
     // 4. Generate JWT token pair
     debug!("Generating JWT token pair");
-    let token_pair = match state
-        .jwt_service
-        .create_token_pair(user_id, &state.db_pool)
-        .await
-    {
+    let token_pair = match state.jwt_service.create_token_pair(user_id).await {
         Ok(pair) => {
             info!("JWT token pair created successfully");
             pair
@@ -247,7 +238,7 @@ pub async fn verify_code(
         Json(AuthResponse {
             access_token: token_pair.access_token,
             refresh_token: token_pair.refresh_token,
-            token_type: "Bearer".to_string(),
+            token_type: "Bearer".into(),
             expires_in: token_pair.expires_in,
         }),
     )
@@ -255,6 +246,8 @@ pub async fn verify_code(
 }
 
 /// Refreshes JWT token pair using a valid refresh token.
+///
+/// POST /api/auth/refresh refresh_token=
 ///
 /// This endpoint allows clients to obtain new access and refresh tokens
 /// using a valid refresh token, extending the user's session without
@@ -279,7 +272,7 @@ pub async fn refresh_token(
 
     match state
         .jwt_service
-        .refresh_token_pair(&payload.refresh_token, &state.db_pool)
+        .refresh_token_pair(&payload.refresh_token)
         .await
     {
         Ok(token_pair) => {
@@ -289,7 +282,7 @@ pub async fn refresh_token(
                 Json(AuthResponse {
                     access_token: token_pair.access_token,
                     refresh_token: token_pair.refresh_token,
-                    token_type: "Bearer".to_string(),
+                    token_type: "Bearer".into(),
                     expires_in: token_pair.expires_in,
                 }),
             )

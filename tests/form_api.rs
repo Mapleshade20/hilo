@@ -14,8 +14,8 @@ fn create_male_form_submission() -> serde_json::Value {
         "familiar_tags": ["basketball", "pc_fps", "japanese"],
         "aspirational_tags": ["cooking", "study_together"],
         "recent_topics": "I've been really interested in machine learning and AI lately, especially large language models and their applications in natural language processing.",
-        "self_traits": ["outgoing", "curious", "patient"],
-        "ideal_traits": ["kind", "intelligent", "funny"],
+        "self_traits": ["humor", "curiosity", "reliable"],
+        "ideal_traits": ["humor", "curiosity", "reliable"],
         "physical_boundary": 2,
         "self_intro": "Hi! I'm a computer science student who loves sports and gaming. I enjoy learning new technologies and meeting interesting people.",
         "profile_photo_path": null
@@ -29,8 +29,8 @@ fn create_female_form_submission() -> serde_json::Value {
         "familiar_tags": ["dance", "cooking", "china"],
         "aspirational_tags": ["wild", "board_games"],
         "recent_topics": "I've been exploring different cooking techniques from various cultures and really enjoying the process of creating new dishes.",
-        "self_traits": ["creative", "empathetic", "organized"],
-        "ideal_traits": ["respectful", "adventurous", "honest"],
+        "self_traits": ["humor", "curiosity", "reliable"],
+        "ideal_traits": ["humor", "curiosity", "reliable"],
         "physical_boundary": 1,
         "self_intro": "I'm passionate about arts and culture. I love dancing, cooking, and exploring new places with interesting people."
     })
@@ -346,7 +346,7 @@ async fn test_submit_form_invalid_tags(pool: PgPool) {
     assert!(body.contains("Invalid familiar tag"));
 
     // Test with non-matchable tags
-    form_data["familiar_tags"] = json!(["sports"]);
+    form_data["familiar_tags"] = json!(["desktop"]);
 
     let response = client
         .post(format!("{}/api/form", &address))
@@ -360,8 +360,24 @@ async fn test_submit_form_invalid_tags(pool: PgPool) {
     let body = response.text().await.expect("Failed to read response");
     assert!(body.contains("Invalid familiar tag"));
 
-    // Test with duplicate tags
+    // Test with internal duplicate tags
     form_data["familiar_tags"] = json!(["pc_fps", "pc_fps"]);
+
+    let response = client
+        .post(format!("{}/api/form", &address))
+        .header("Authorization", format!("Bearer {access_token}"))
+        .json(&form_data)
+        .send()
+        .await
+        .expect("Failed to submit form");
+
+    assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
+    let body = response.text().await.expect("Failed to read response");
+    assert!(body.contains("Duplicate tag"));
+
+    // Test with duplicate tags between familiar and aspirational
+    form_data["familiar_tags"] = json!(["pc_fps"]);
+    form_data["aspirational_tags"] = json!(["pc_fps", "cooking"]);
 
     let response = client
         .post(format!("{}/api/form", &address))

@@ -19,63 +19,39 @@ use std::sync::Arc;
 use axum::{
     Router,
     middleware::from_fn_with_state,
-    routing::{get, post},
+    routing::{delete, get, post},
 };
 use jsonwebtoken::{DecodingKey, EncodingKey};
-use secrecy::{ExposeSecret, SecretSlice};
 use sqlx::PgPool;
 use tracing::info;
 
 use crate::handlers::{
-    get_form, get_profile, health_check, refresh_token, send_verification_code, submit_form,
-    upload_card, upload_profile_photo, verify_code,
+    add_veto, get_form, get_previews, get_profile, get_vetoes, health_check, refresh_token,
+    remove_veto, send_verification_code, submit_form, upload_card, upload_profile_photo,
+    verify_code,
 };
 use crate::middleware::auth_middleware;
-use crate::models::{AppState, TagSystem};
+use crate::models::AppState;
 use crate::services::email::{EmailService, ExternalEmailer, LogEmailer};
 use crate::services::jwt::JwtService;
-use crate::utils::constant::*;
+use crate::services::matching::MatchingService;
+use crate::utils::{constant::*, static_object::TAG_SYSTEM};
 
 /// Creates an Axum router with default email service configuration.
 ///
-/// This is a convenience function that calls [`app_with_email_service`] with no custom email service,
-/// causing it to auto-detect the appropriate email service based on the `APP_ENV` environment variable.
-#[inline]
-pub fn app(db_pool: PgPool) -> Router {
-    app_with_email_service(db_pool, None)
-}
-
-/// Creates an Axum router with application routes and state.
-///
-/// # Arguments
-///
-/// * `db_pool` - PostgreSQL database connection pool
-/// * `email_service` - Optional custom email service. If None, will auto-detect based on APP_ENV
-///
 /// # Environment Variables
 ///
-/// - `APP_ENV` - "production" uses ExternalEmailer, otherwise uses LogEmailer (mock)
-/// - `MAIL_API_URL` - Required in production for external email service
-/// - `MAIL_API_KEY` - Required in production for external email service
-/// - `SENDER_EMAIL` - Required in production for external email service
-/// - `JWT_SECRET` - Required for JWT token signing and validation
-///
-/// # Returns
-///
-/// A configured Axum router with all application routes and middleware
-pub fn app_with_email_service(
-    db_pool: PgPool,
-    email_service: Option<Arc<dyn EmailService>>,
-) -> Router {
-    let email_service: Arc<dyn EmailService> = if let Some(service) = email_service {
-        service
-    } else {
-        let app_env = env::var("APP_ENV")
-            .expect("Env variable `APP_ENV` should be set")
-            .to_ascii_lowercase();
-
-        if app_env == "production" {
-            info!("Running in production mode with [ExternalEmailer]");
+/// - `EMAIL_PROVIDER` - "external" uses ExternalEmailer, "log" uses LogEmailer (default)
+/// - `MAIL_API_URL`   - Required in production for external email service
+/// - `MAIL_API_KEY`   - Required in production for external email service
+/// - `SENDER_EMAIL`   - Required in production for external email service
+pub fn app(db_pool: PgPool) -> Router {
+    let email_service: Arc<dyn EmailService> = match env::var("EMAIL_PROVIDER")
+        .expect("Env variable `EMAIL_PROVIDER` should be set")
+        .as_str()
+    {
+        "external" => {
+            info!("Email provider set to [ExternalEmailer]");
             let api_url =
                 env::var("MAIL_API_URL").expect("Env variable `MAIL_API_URL` should be set");
             let api_key =
@@ -83,31 +59,45 @@ pub fn app_with_email_service(
             let sender =
                 env::var("SENDER_EMAIL").expect("Env variable `SENDER_EMAIL` should be set");
             Arc::new(ExternalEmailer::new(api_url, api_key, sender))
-        } else {
-            info!("Running in development mode with [LogEmailer (Mock)]");
+        }
+        _ => {
+            info!("Email provider set to [LogEmailer]");
             Arc::new(LogEmailer)
         }
     };
 
-    let jwt_keys = SecretSlice::from(
-        env::var("JWT_SECRET")
-            .expect("Env variable `JWT_SECRET` should be set")
-            .into_bytes(),
-    );
+    app_with_email_service(db_pool, email_service)
+}
 
-    let jwt_service = JwtService::new(
-        EncodingKey::from_secret(jwt_keys.expose_secret()),
-        DecodingKey::from_secret(jwt_keys.expose_secret()),
-    );
-
-    let tag_system =
-        TagSystem::from_json("tags.json").expect("Failed to load tag system from tags.json");
+/// Creates an Axum router with application routes and state.
+///
+/// # Arguments
+///
+/// * `db_pool` - PostgreSQL database connection pool
+/// * `email_service` - Custom email service
+///
+/// # Environment Variables
+///
+/// - `JWT_SECRET` - Required for JWT token signing and validation
+///
+/// # Returns
+///
+/// A configured Axum router with all application routes and middleware
+pub fn app_with_email_service(db_pool: PgPool, email_service: Arc<dyn EmailService>) -> Router {
+    let jwt_service = {
+        let secret = env::var("JWT_SECRET").expect("Env variable `JWT_SECRET` should be set");
+        JwtService::new(
+            EncodingKey::from_secret(secret.as_bytes()),
+            DecodingKey::from_secret(secret.as_bytes()),
+            db_pool.clone(),
+        )
+    };
 
     let state = Arc::new(AppState::new(
         email_service,
         db_pool,
         jwt_service,
-        tag_system,
+        &TAG_SYSTEM,
     ));
 
     let state_clone = Arc::clone(&state);
@@ -120,12 +110,22 @@ pub fn app_with_email_service(
         }
     });
 
+    // Spawn the match preview generation background task
+    MatchingService::spawn_preview_generation_task(
+        state.db_pool.clone(),
+        Arc::new(state.tag_system.clone()),
+    );
+
     let protected_routes = Router::new()
         .route("/api/profile", get(get_profile))
         .route("/api/form", post(submit_form))
         .route("/api/form", get(get_form))
         .route("/api/upload/card", post(upload_card))
         .route("/api/upload/profile-photo", post(upload_profile_photo))
+        .route("/api/veto/previews", get(get_previews))
+        .route("/api/veto", post(add_veto))
+        .route("/api/veto", delete(remove_veto))
+        .route("/api/vetoes", get(get_vetoes))
         .route_layer(from_fn_with_state(Arc::clone(&state), auth_middleware));
 
     let public_routes = Router::new()

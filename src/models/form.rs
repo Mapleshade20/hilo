@@ -1,17 +1,16 @@
 use std::collections::HashSet;
-use std::env;
 
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
 use serde::{Deserialize, Serialize};
-use tracing::{error, warn};
+use tracing::warn;
 use uuid::Uuid;
 
 use crate::handlers::FormRequest;
 use crate::models::TagSystem;
-use crate::utils::constant::*;
+use crate::utils::{constant::*, static_object::TOTAL_TAGS};
 
 #[derive(Debug, Serialize, Deserialize, sqlx::Type, PartialEq, Eq, Clone, Copy)]
 #[sqlx(type_name = "gender", rename_all = "snake_case")]
@@ -59,15 +58,7 @@ impl FormRequest {
         }
 
         // Validate total tags limit
-        let total_tags = env::var("TOTAL_TAGS")
-        .ok()
-        .and_then(|val| val.parse::<usize>().ok())
-        .unwrap_or_else(|| {
-            error!(
-                "Invalid or missing TOTAL_TAGS env var, using fallback value {TOTAL_TAGS_FALLBACK}"
-            );
-            TOTAL_TAGS_FALLBACK
-        });
+        let total_tags = *TOTAL_TAGS;
 
         let user_total_tags = self.familiar_tags.len() + self.aspirational_tags.len();
         if user_total_tags > total_tags {

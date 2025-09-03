@@ -57,12 +57,12 @@ impl EmailService for MockEmailer {
         &self,
         recipient: &str,
         subject: &str,
-        body_html: &str,
+        code: &str,
     ) -> Result<(), EmailError> {
         let email = SentEmail {
             recipient: recipient.to_string(),
             subject: subject.to_string(),
-            body_html: body_html.to_string(),
+            body_html: format!("Your verification code is: {code}"),
         };
 
         self.sent_emails.lock().unwrap().push(email);
@@ -74,6 +74,8 @@ impl EmailService for MockEmailer {
 ///
 /// Returned address format: `http://127.0.0.1:8492`
 pub async fn spawn_app(test_db_pool: PgPool) -> (String, Arc<MockEmailer>) {
+    dotenvy::from_filename_override("tests/data/.test.env").unwrap();
+
     let mock_emailer = Arc::new(MockEmailer::new());
     let mock_cloned = Arc::clone(&mock_emailer);
 
@@ -84,7 +86,7 @@ pub async fn spawn_app(test_db_pool: PgPool) -> (String, Arc<MockEmailer>) {
     let port = listener.local_addr().unwrap().port();
 
     tokio::spawn(async move {
-        let app = hilo::app_with_email_service(test_db_pool, Some(mock_cloned));
+        let app = hilo::app_with_email_service(test_db_pool, mock_cloned);
         axum::serve(listener, app).await.unwrap();
     });
 

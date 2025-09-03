@@ -1,0 +1,84 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT user_id, gender as \"gender: Gender\", familiar_tags, aspirational_tags, recent_topics, \n               self_traits, ideal_traits, physical_boundary, self_intro, profile_photo_path\n        FROM forms\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "gender: Gender",
+        "type_info": {
+          "Custom": {
+            "name": "gender",
+            "kind": {
+              "Enum": [
+                "male",
+                "female"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "familiar_tags",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 3,
+        "name": "aspirational_tags",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 4,
+        "name": "recent_topics",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "self_traits",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 6,
+        "name": "ideal_traits",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 7,
+        "name": "physical_boundary",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 8,
+        "name": "self_intro",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "profile_photo_path",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "701ca7a46a770fee9bb63e654deaae9960b000b409687f8f3d449bf759ee50ec"
+}
