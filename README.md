@@ -12,12 +12,6 @@ This is the backend of a social pairing project. It authenticates male and femal
 
 ### Part IV. View Final Result
 
-TODO:
-
-- once a final match is triggered, clear all vetoes and previews in database.
-- add a accept/reject final match result api for `matched` status users; if the user reject, revert to `form_completed` status for them and their partner, clear the previews. (so they and their partner, along with other unmatched users, will wait for the next round)
-- change the get profile api to return the partner's profile (only the fields designated in `FinalPartnerProfile`) if self's status is `matched` or `confirmed`.
-
 ## Notes for new developers
 
 This repository uses [pre-commit](https://pre-commit.com/) to check correct formatting, prevent undesired issues and enforce [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/). Make sure you run the following check before PR.

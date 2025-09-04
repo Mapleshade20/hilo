@@ -2,89 +2,10 @@ mod common;
 
 use std::sync::Arc;
 
-use common::{MockEmailer, create_test_image, get_access_token, spawn_app};
+use common::*;
 use hilo::models::{Form, Gender, UserStatus};
-use reqwest::multipart;
-use serde_json::{Value, json};
+use serde_json::json;
 use sqlx::PgPool;
-
-fn create_male_form_submission() -> serde_json::Value {
-    json!({
-        "wechat_id": "test_wechat_123",
-        "gender": "male",
-        "familiar_tags": ["basketball", "pc_fps", "japanese"],
-        "aspirational_tags": ["cooking", "study_together"],
-        "recent_topics": "I've been really interested in machine learning and AI lately, especially large language models and their applications in natural language processing.",
-        "self_traits": ["humor", "curiosity", "reliable"],
-        "ideal_traits": ["humor", "curiosity", "reliable"],
-        "physical_boundary": 2,
-        "self_intro": "Hi! I'm a computer science student who loves sports and gaming. I enjoy learning new technologies and meeting interesting people.",
-    })
-}
-
-fn create_female_form_submission() -> serde_json::Value {
-    json!({
-        "wechat_id": "test_wechat_456",
-        "gender": "female",
-        "familiar_tags": ["dance", "cooking", "china"],
-        "aspirational_tags": ["wild", "board_games"],
-        "recent_topics": "I've been exploring different cooking techniques from various cultures and really enjoying the process of creating new dishes.",
-        "self_traits": ["humor", "curiosity", "reliable"],
-        "ideal_traits": ["humor", "curiosity", "reliable"],
-        "physical_boundary": 1,
-        "self_intro": "I'm passionate about arts and culture. I love dancing, cooking, and exploring new places with interesting people."
-    })
-}
-
-async fn create_form_with_profile_photo(
-    client: &reqwest::Client,
-    address: &str,
-    access_token: &str,
-) -> serde_json::Value {
-    // Create test image
-    let image_data = create_test_image();
-
-    // Upload profile photo
-    let form = multipart::Form::new().part(
-        "photo",
-        multipart::Part::bytes(image_data)
-            .file_name("profile.png")
-            .mime_str("image/png")
-            .unwrap(),
-    );
-
-    let response = client
-        .post(format!("{address}/api/upload/profile-photo"))
-        .header("Authorization", format!("Bearer {access_token}"))
-        .multipart(form)
-        .send()
-        .await
-        .expect("Failed to upload profile photo");
-
-    assert_eq!(response.status(), reqwest::StatusCode::OK);
-
-    // Parse JSON response
-    let response_json: Value = response
-        .json()
-        .await
-        .expect("Failed to parse JSON response");
-    let filename = response_json["filename"]
-        .as_str()
-        .expect("Should return a filename");
-
-    json!({
-        "wechat_id": "test_wechat_456",
-        "gender": "female",
-        "familiar_tags": ["dance", "cooking", "china"],
-        "aspirational_tags": ["wild", "board_games"],
-        "recent_topics": "I've been exploring different cooking techniques from various cultures and really enjoying the process of creating new dishes.",
-        "self_traits": ["humor", "curiosity", "reliable"],
-        "ideal_traits": ["humor", "curiosity", "reliable"],
-        "physical_boundary": 1,
-        "self_intro": "I'm passionate about arts and culture. I love dancing, cooking, and exploring new places with interesting people.",
-        "profile_photo_filename": filename
-    })
-}
 
 async fn setup_verified_user(
     client: &reqwest::Client,

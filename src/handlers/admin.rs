@@ -13,19 +13,17 @@ use serde_json::json;
 use sqlx::PgPool;
 use tracing::{error, info, instrument, warn};
 use uuid::Uuid;
-use validator::Validate;
 
 use crate::models::{FinalMatch, Form, TagSystem, UserStatus, Veto};
 use crate::services::matching::MatchingService;
-use crate::utils::static_object::{EMAIL_REGEX, TAG_SYSTEM};
+use crate::utils::static_object::TAG_SYSTEM;
 
 /// Request payload for admin user verification
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize)]
 pub struct VerifyUserRequest {
     /// User ID (takes priority if both id and email are provided)
     pub user_id: Option<Uuid>,
     /// User email (used if user_id is not provided)
-    #[validate(regex(path = "*EMAIL_REGEX"))]
     pub email: Option<String>,
     /// Target verification status (verified or unverified)
     pub status: UserStatus,
@@ -120,20 +118,7 @@ pub async fn verify_user(
     State(state): State<Arc<AdminState>>,
     Json(payload): Json<VerifyUserRequest>,
 ) -> Result<Json<VerifyUserResponse>, Response> {
-    // 1. Validate input
-    if payload.validate().is_err() {
-        warn!("Invalid verify user request format");
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(json!({
-                "success": false,
-                "error": "Invalid input format"
-            })),
-        )
-            .into_response());
-    }
-
-    // 2. Validate target status
+    // Validate target status
     if !matches!(
         payload.status,
         UserStatus::Verified | UserStatus::Unverified
@@ -229,21 +214,28 @@ async fn execute_final_matching(
     db_pool: &PgPool,
     tag_system: &TagSystem,
 ) -> Result<Vec<FinalMatch>, Box<dyn std::error::Error + Send + Sync>> {
-    // 1. Fetch all users with submitted forms
+    // Clear all vetoes and previews before starting final matching
+    info!("Clearing all vetoes and match previews");
+    sqlx::query!("DELETE FROM vetoes").execute(db_pool).await?;
+    sqlx::query!("DELETE FROM match_previews")
+        .execute(db_pool)
+        .await?;
+
+    // Fetch all users with submitted forms
     let forms = MatchingService::fetch_unmatched_forms(db_pool).await?;
     if forms.is_empty() {
         return Ok(vec![]);
     }
 
-    // 2. Fetch all veto records
+    // Fetch all veto records (should be empty after clearing)
     let vetoes = fetch_all_vetoes(db_pool).await?;
     let veto_map = build_veto_map(&vetoes);
 
-    // 3. Calculate tag frequencies for IDF scoring
+    // Calculate tag frequencies for IDF scoring
     let tag_frequencies = calculate_tag_frequencies(&forms);
     let total_user_count = forms.len() as u32;
 
-    // 4. Build score matrix for all valid pairs
+    // Build score matrix for all valid pairs
     let mut pair_scores = Vec::new();
 
     for (i, form_a) in forms.iter().enumerate() {
@@ -273,10 +265,10 @@ async fn execute_final_matching(
         }
     }
 
-    // 5. Sort by score (descending) for greedy algorithm
+    // Sort by score (descending) for greedy algorithm
     pair_scores.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
 
-    // 6. Greedy matching algorithm
+    // Greedy matching algorithm
     let mut matched_users = HashSet::new();
     let mut final_matches = Vec::new();
 
@@ -289,6 +281,23 @@ async fn execute_final_matching(
             matched_users.insert(user_a);
             matched_users.insert(user_b);
         }
+    }
+
+    // Update status of matched users to 'matched'
+    for final_match in &final_matches {
+        sqlx::query!(
+            r#"UPDATE users SET status = 'matched' WHERE id = $1"#,
+            final_match.user_a_id
+        )
+        .execute(db_pool)
+        .await?;
+
+        sqlx::query!(
+            r#"UPDATE users SET status = 'matched' WHERE id = $1"#,
+            final_match.user_b_id
+        )
+        .execute(db_pool)
+        .await?;
     }
 
     Ok(final_matches)

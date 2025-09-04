@@ -26,11 +26,10 @@ use sqlx::PgPool;
 use tracing::info;
 
 use crate::handlers::{
-    add_veto, get_form, get_previews, get_profile, get_vetoes, health_check, refresh_token,
-    remove_veto, send_verification_code, submit_form, upload_card, upload_profile_photo,
-    verify_code,
+    accept_final_match, add_veto, get_form, get_previews, get_profile, get_vetoes, health_check,
+    refresh_token, reject_final_match, remove_veto, send_verification_code, serve_partner_image,
+    submit_form, upload_card, upload_profile_photo, verify_code,
 };
-use crate::middleware::auth_middleware;
 use crate::models::AppState;
 use crate::services::email::{EmailService, ExternalEmailer, LogEmailer};
 use crate::services::jwt::JwtService;
@@ -126,7 +125,19 @@ pub fn app_with_email_service(db_pool: PgPool, email_service: Arc<dyn EmailServi
         .route("/api/veto", post(add_veto))
         .route("/api/veto", delete(remove_veto))
         .route("/api/vetoes", get(get_vetoes))
-        .route_layer(from_fn_with_state(Arc::clone(&state), auth_middleware));
+        .route("/api/final-match/accept", post(accept_final_match))
+        .route("/api/final-match/reject", post(reject_final_match))
+        .route(
+            "/api/images/partner/{filename}",
+            get(serve_partner_image).route_layer(from_fn_with_state(
+                Arc::clone(&state),
+                middleware::photo_middleware,
+            )),
+        )
+        .route_layer(from_fn_with_state(
+            Arc::clone(&state),
+            middleware::auth_middleware,
+        ));
 
     let public_routes = Router::new()
         .route("/health-check", get(health_check))

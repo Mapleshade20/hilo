@@ -17,8 +17,10 @@
 
 mod admin;
 mod auth;
+mod final_match;
 mod form;
 mod health_check;
+mod partner_image;
 mod profile;
 mod upload_card;
 mod upload_profile_photo;
@@ -26,8 +28,10 @@ mod veto;
 
 pub use admin::*;
 pub use auth::*;
+pub use final_match::*;
 pub use form::*;
 pub use health_check::*;
+pub use partner_image::*;
 pub use profile::*;
 pub use upload_card::*;
 pub use upload_profile_photo::*;

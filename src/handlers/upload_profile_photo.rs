@@ -77,7 +77,7 @@ pub async fn upload_profile_photo(
 ) -> impl IntoResponse {
     debug!("Processing profile photo upload request");
 
-    // 1. Check user status - only verified and form_completed users can upload
+    // Check user status - only verified and form_completed users can upload
     let user_status = match UserStatus::query(&state.db_pool, &user.user_id).await {
         Ok(status) => status,
         Err(resp) => {
@@ -95,7 +95,7 @@ pub async fn upload_profile_photo(
             .into_response();
     }
 
-    // 2. Extract file from multipart form
+    // Extract file from multipart form
     let field = match multipart.next_field().await {
         Ok(Some(field)) => field,
         Ok(None) => {
@@ -108,14 +108,14 @@ pub async fn upload_profile_photo(
         }
     };
 
-    // 3. Validate content type
+    // Validate content type
     let content_type = field.content_type().unwrap_or("");
     if let Err(e) = ImageUploadValidator::validate_content_type(content_type) {
         warn!(content_type = %content_type, error = %e, "Invalid content type");
         return (StatusCode::BAD_REQUEST, e).into_response();
     }
 
-    // 4. Read file data
+    // Read file data
     let file_data = match field.bytes().await {
         Ok(data) => data,
         Err(e) => {
@@ -124,13 +124,13 @@ pub async fn upload_profile_photo(
         }
     };
 
-    // 5. Validate file is not empty
+    // Validate file is not empty
     if let Err(e) = ImageUploadValidator::validate_file_not_empty(&file_data) {
         warn!(error = %e, "Empty file uploaded");
         return (StatusCode::BAD_REQUEST, e).into_response();
     }
 
-    // 6. Validate format using image crate
+    // Validate format using image crate
     let (file_extension, image_format) =
         match ImageUploadValidator::validate_image_format(&file_data) {
             Ok((ext, format)) => (ext, format),
@@ -142,7 +142,7 @@ pub async fn upload_profile_photo(
 
     trace!(format = ?image_format, size = file_data.len(), "Image validation passed");
 
-    // 7. Prepare file storage
+    // Prepare file storage
     let profile_photos_dir = Path::new(UPLOAD_DIR.as_str()).join("profile_photos");
     if let Err(e) = FileManager::ensure_directory_exists(&profile_photos_dir).await {
         error!(error = %e, "Failed to create upload directory");
@@ -154,7 +154,7 @@ pub async fn upload_profile_photo(
 
     debug!(file_path = %full_path.display(), "Saving profile photo");
 
-    // 8. Write file to disk
+    // Write file to disk
     if let Err(e) = FileManager::save_file(&full_path, &file_data).await {
         error!(error = %e, "Failed to save file");
         return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to save file").into_response();

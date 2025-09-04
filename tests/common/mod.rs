@@ -5,7 +5,8 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use hilo::handlers::AuthResponse;
 use hilo::services::email::{EmailError, EmailService};
-use serde_json::json;
+use reqwest::multipart;
+use serde_json::{Value, json};
 use sqlx::PgPool;
 use tokio::net::TcpListener;
 
@@ -71,6 +72,7 @@ impl EmailService for MockEmailer {
 }
 
 /// Spawns the application and returns its address and mock emailer for testing.
+/// Includes both main app routes and admin routes for comprehensive testing.
 ///
 /// Returned address format: `http://127.0.0.1:8492`
 pub async fn spawn_app(test_db_pool: PgPool) -> (String, Arc<MockEmailer>) {
@@ -86,8 +88,12 @@ pub async fn spawn_app(test_db_pool: PgPool) -> (String, Arc<MockEmailer>) {
     let port = listener.local_addr().unwrap().port();
 
     tokio::spawn(async move {
-        let app = hilo::app_with_email_service(test_db_pool, mock_cloned);
-        axum::serve(listener, app).await.unwrap();
+        // Create the main app with admin routes merged in
+        let main_app = hilo::app_with_email_service(test_db_pool.clone(), mock_cloned);
+        let admin_router = hilo::handlers::admin_router(test_db_pool);
+        let combined_app = main_app.merge(admin_router);
+
+        axum::serve(listener, combined_app).await.unwrap();
     });
 
     let address = format!("http://127.0.0.1:{port}");
@@ -171,4 +177,264 @@ pub fn create_test_image() -> Vec<u8> {
         0xAE, 0x42, 0x60, 0x82, // CRC
     ];
     png_data
+}
+
+pub fn create_male_form_submission() -> serde_json::Value {
+    json!({
+        "wechat_id": "test_wechat_123",
+        "gender": "male",
+        "familiar_tags": ["basketball", "pc_fps", "japanese"],
+        "aspirational_tags": ["cooking", "study_together"],
+        "recent_topics": "I've been really interested in machine learning and AI lately, especially large language models and their applications in natural language processing.",
+        "self_traits": ["humor", "curiosity", "reliable"],
+        "ideal_traits": ["humor", "curiosity", "reliable"],
+        "physical_boundary": 2,
+        "self_intro": "Hi! I'm a computer science student who loves sports and gaming. I enjoy learning new technologies and meeting interesting people.",
+    })
+}
+
+pub fn create_female_form_submission() -> serde_json::Value {
+    json!({
+        "wechat_id": "test_wechat_456",
+        "gender": "female",
+        "familiar_tags": ["dance", "cooking", "china"],
+        "aspirational_tags": ["wild", "board_games"],
+        "recent_topics": "I've been exploring different cooking techniques from various cultures and really enjoying the process of creating new dishes.",
+        "self_traits": ["humor", "curiosity", "reliable"],
+        "ideal_traits": ["humor", "curiosity", "reliable"],
+        "physical_boundary": 1,
+        "self_intro": "I'm passionate about arts and culture. I love dancing, cooking, and exploring new places with interesting people."
+    })
+}
+
+pub async fn create_form_with_profile_photo(
+    client: &reqwest::Client,
+    address: &str,
+    access_token: &str,
+) -> serde_json::Value {
+    // Create test image
+    let image_data = create_test_image();
+
+    // Upload profile photo
+    let form = multipart::Form::new().part(
+        "photo",
+        multipart::Part::bytes(image_data)
+            .file_name("profile.png")
+            .mime_str("image/png")
+            .unwrap(),
+    );
+
+    let response = client
+        .post(format!("{address}/api/upload/profile-photo"))
+        .header("Authorization", format!("Bearer {access_token}"))
+        .multipart(form)
+        .send()
+        .await
+        .expect("Failed to upload profile photo");
+
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+
+    // Parse JSON response
+    let response_json: Value = response
+        .json()
+        .await
+        .expect("Failed to parse JSON response");
+    let filename = response_json["filename"]
+        .as_str()
+        .expect("Should return a filename");
+
+    json!({
+        "wechat_id": "test_wechat_456",
+        "gender": "female",
+        "familiar_tags": ["dance", "cooking", "china"],
+        "aspirational_tags": ["wild", "board_games"],
+        "recent_topics": "I've been exploring different cooking techniques from various cultures and really enjoying the process of creating new dishes.",
+        "self_traits": ["humor", "curiosity", "reliable"],
+        "ideal_traits": ["humor", "curiosity", "reliable"],
+        "physical_boundary": 1,
+        "self_intro": "I'm passionate about arts and culture. I love dancing, cooking, and exploring new places with interesting people.",
+        "profile_photo_filename": filename
+    })
+}
+
+/// Admin helper to verify a user via email
+pub async fn admin_verify_user(
+    client: &reqwest::Client,
+    address: &str,
+    email: &str,
+    status: &str,
+) -> bool {
+    let response = client
+        .post(format!("{address}/api/admin/verify-user"))
+        .json(&json!({
+            "email": email,
+            "status": status
+        }))
+        .send()
+        .await
+        .expect("Failed to send admin verify request");
+
+    if response.status() != reqwest::StatusCode::OK {
+        println!(
+            "Admin verify failed for {}: Status {}",
+            email,
+            response.status()
+        );
+        if let Ok(body) = response.text().await {
+            println!("Error response: {body}");
+        }
+        return false;
+    }
+
+    true
+}
+
+/// Admin helper to trigger final matching
+pub async fn admin_trigger_final_match(
+    client: &reqwest::Client,
+    address: &str,
+) -> serde_json::Value {
+    let response = client
+        .post(format!("{address}/api/admin/trigger-match"))
+        .send()
+        .await
+        .expect("Failed to trigger final match");
+
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    response.json().await.expect("Failed to parse response")
+}
+
+/// Helper to upload card for user
+pub async fn upload_card(client: &reqwest::Client, address: &str, access_token: &str) {
+    let image_data = create_test_image();
+
+    let form = multipart::Form::new()
+        .part(
+            "card",
+            multipart::Part::bytes(image_data)
+                .file_name("card.png")
+                .mime_str("image/png")
+                .unwrap(),
+        )
+        .text("grade", "undergraduate");
+
+    let response = client
+        .post(format!("{address}/api/upload/card"))
+        .header("Authorization", format!("Bearer {access_token}"))
+        .multipart(form)
+        .send()
+        .await
+        .expect("Failed to upload card");
+
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+}
+
+/// Helper to upload profile photo and get filename
+pub async fn upload_profile_photo(
+    client: &reqwest::Client,
+    address: &str,
+    access_token: &str,
+) -> String {
+    let image_data = create_test_image();
+
+    let form = multipart::Form::new().part(
+        "photo",
+        multipart::Part::bytes(image_data)
+            .file_name("profile.png")
+            .mime_str("image/png")
+            .unwrap(),
+    );
+
+    let response = client
+        .post(format!("{address}/api/upload/profile-photo"))
+        .header("Authorization", format!("Bearer {access_token}"))
+        .multipart(form)
+        .send()
+        .await
+        .expect("Failed to upload profile photo");
+
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+
+    let response_json: Value = response
+        .json()
+        .await
+        .expect("Failed to parse JSON response");
+
+    response_json["filename"]
+        .as_str()
+        .expect("Should return a filename")
+        .to_string()
+}
+
+/// Helper to access partner image
+pub async fn access_partner_image(
+    client: &reqwest::Client,
+    address: &str,
+    access_token: &str,
+    image_url: &str,
+) -> reqwest::StatusCode {
+    let response = client
+        .get(format!("{address}{image_url}"))
+        .header("Authorization", format!("Bearer {access_token}"))
+        .send()
+        .await
+        .expect("Failed to access partner image");
+
+    response.status()
+}
+
+/// Complete setup for two matched users - returns (male_token, female_token)
+pub async fn setup_two_matched_users(
+    client: &reqwest::Client,
+    address: &str,
+    mock_emailer: &Arc<MockEmailer>,
+) -> (String, String) {
+    let male_email = "male@mails.tsinghua.edu.cn";
+    let female_email = "female@mails.tsinghua.edu.cn";
+
+    // 1. Get access tokens for both users
+    let male_token = get_access_token(client, address, mock_emailer, male_email).await;
+    let female_token = get_access_token(client, address, mock_emailer, female_email).await;
+
+    // 2. Upload cards for both users
+    upload_card(client, address, &male_token).await;
+    upload_card(client, address, &female_token).await;
+
+    // 3. Admin verifies both users
+    assert!(admin_verify_user(client, address, male_email, "verified").await);
+    assert!(admin_verify_user(client, address, female_email, "verified").await);
+
+    // 4. Upload profile photos and submit forms
+    let male_photo_filename = upload_profile_photo(client, address, &male_token).await;
+    let female_photo_filename = upload_profile_photo(client, address, &female_token).await;
+
+    let mut male_form = create_male_form_submission();
+    male_form["profile_photo_filename"] = json!(male_photo_filename);
+
+    let mut female_form = create_female_form_submission();
+    female_form["profile_photo_filename"] = json!(female_photo_filename);
+
+    // Submit forms
+    let response = client
+        .post(format!("{address}/api/form"))
+        .header("Authorization", format!("Bearer {male_token}"))
+        .json(&male_form)
+        .send()
+        .await
+        .expect("Failed to submit male form");
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+
+    let response = client
+        .post(format!("{address}/api/form"))
+        .header("Authorization", format!("Bearer {female_token}"))
+        .json(&female_form)
+        .send()
+        .await
+        .expect("Failed to submit female form");
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+
+    // 5. Admin triggers final matching
+    admin_trigger_final_match(client, address).await;
+
+    (male_token, female_token)
 }

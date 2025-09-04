@@ -1,7 +1,7 @@
-//! # Middleware Components
+//! # Authentication Middleware
 //!
-//! This module contains middleware functions that handle cross-cutting concerns
-//! such as authentication, authorization, and request processing.
+//! This module contains the authentication middleware that validates JWT tokens
+//! and provides user context to protected routes.
 
 use std::sync::Arc;
 
@@ -47,7 +47,7 @@ pub async fn auth_middleware(
     mut req: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
-    debug!("Processing authentication middleware");
+    trace!("Processing authentication middleware");
 
     let auth_header = req
         .headers()

@@ -38,12 +38,10 @@ pub struct ProfilePreview {
     pub grade: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct FinalMatchResponse {
-    pub is_matched: bool,
-    pub partner_profile: Option<FinalPartnerProfile>,
-}
-
+/// Profile information of the final match partner
+///
+/// Containing: email domain, grade, familiar tags, aspirational tags,
+/// self introduction, and photo URL (if any).
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FinalPartnerProfile {
     pub email_domain: String,
@@ -51,5 +49,6 @@ pub struct FinalPartnerProfile {
     pub familiar_tags: Vec<String>,
     pub aspirational_tags: Vec<String>,
     pub self_intro: String,
+    /// Format: /api/images/partner/someuuid.ext
     pub photo_url: Option<String>,
 }
