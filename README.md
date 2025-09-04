@@ -12,6 +12,12 @@ This is the backend of a social pairing project. It authenticates male and femal
 
 ### Part IV. View Final Result
 
+TODO:
+
+- store match points in preview db
+- admin view api: (1) all previews (page=X), (2) all tags: users count and IDF of each tag, (3) all final matches
+- user get/accept/reject final match result api, if reject, revert to form_completed status for both users
+
 ## Notes for new developers
 
 - Run `pre-commit install` after cloning the repo

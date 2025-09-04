@@ -18,6 +18,7 @@ use hilo::{
 };
 use sqlx::PgPool;
 use tokio::net::TcpListener;
+use tokio_util::sync::CancellationToken;
 use tracing::{info, instrument, warn};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -39,54 +40,65 @@ async fn main() {
 
     info!("Connected to PostgreSQL database");
 
-    // 3. Create a future that resolves on Ctrl+C
+    // 3. Create a shared cancellation token
+    let shutdown_token = CancellationToken::new();
+    let main_shutdown = shutdown_token.child_token();
+    let admin_shutdown = shutdown_token.child_token();
     let shutdown_signal = async {
         tokio::signal::ctrl_c()
             .await
             .expect("Failed to listen for ctrl_c signal");
-        info!("Ctrl+C received, shutting down both servers");
     };
 
     // 4. Start main server
     LazyLock::force(&EMAIL_REGEX); // ensure panic happens at startup
     LazyLock::force(&TAG_SYSTEM);
-    let main_db_pool = db_pool.clone();
-    let main_server = tokio::spawn(async move {
-        let app = app(main_db_pool);
+    let main_db = db_pool.clone();
+    let mut main_server = tokio::spawn(async move {
+        let router = app(main_db);
         let addr = env::var("ADDRESS").expect("Env variable `ADDRESS` should be set");
         let listener = TcpListener::bind(&addr).await.unwrap();
         info!("Main server starting at http://{}", addr);
 
-        axum::serve(listener, app.into_make_service())
+        axum::serve(listener, router.into_make_service())
+            .with_graceful_shutdown(main_shutdown.cancelled_owned())
             .await
             .unwrap();
     });
 
     // 5. Start admin server
     // Admin server is protected by Cloudflare Access, so no additional auth is needed
-    let admin_server = tokio::spawn(async move {
-        let app = admin_router(db_pool);
+    let mut admin_server = tokio::spawn(async move {
+        let router = admin_router(db_pool);
         let addr = env::var("ADMIN_ADDRESS").expect("Env variable `ADMIN_ADDRESS` should be set");
         let listener = TcpListener::bind(&addr).await.unwrap();
         info!("Admin server starting at http://{}", addr);
 
-        axum::serve(listener, app.into_make_service())
+        axum::serve(listener, router.into_make_service())
+            .with_graceful_shutdown(admin_shutdown.cancelled_owned())
             .await
             .unwrap();
     });
 
     // 6. Wait for either server to complete or shutdown signal
     tokio::select! {
-        _ = main_server => {
+        _ = &mut main_server => {
             warn!("Main server terminated unexpectedly");
+            shutdown_token.cancel();
         }
-        _ = admin_server => {
+        _ = &mut admin_server => {
             warn!("Admin server terminated unexpectedly");
+            shutdown_token.cancel();
         }
         _ = shutdown_signal => {
-            info!("Graceful shutdown initiated");
+            info!("Ctrl-C received - initiating graceful shutdown");
+            shutdown_token.cancel();
         }
     }
+    let _ = main_server.await;
+    let _ = admin_server.await;
+
+    info!("Shutdown complete");
 }
 
 /// Initialize tracing with environment-based configuration
