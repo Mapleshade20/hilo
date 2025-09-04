@@ -15,7 +15,7 @@ use tracing::{error, info, instrument, warn};
 use uuid::Uuid;
 use validator::Validate;
 
-use crate::models::{FinalMatch, Form, Gender, TagSystem, UserStatus, Veto};
+use crate::models::{FinalMatch, Form, TagSystem, UserStatus, Veto};
 use crate::services::matching::MatchingService;
 use crate::utils::static_object::{EMAIL_REGEX, TAG_SYSTEM};
 
@@ -230,7 +230,7 @@ async fn execute_final_matching(
     tag_system: &TagSystem,
 ) -> Result<Vec<FinalMatch>, Box<dyn std::error::Error + Send + Sync>> {
     // 1. Fetch all users with submitted forms
-    let forms = fetch_all_forms(db_pool).await?;
+    let forms = MatchingService::fetch_unmatched_forms(db_pool).await?;
     if forms.is_empty() {
         return Ok(vec![]);
     }
@@ -332,19 +332,6 @@ fn calculate_tag_frequencies(forms: &[Form]) -> HashMap<String, u32> {
 }
 
 // Database helper functions
-
-async fn fetch_all_forms(db_pool: &PgPool) -> Result<Vec<Form>, sqlx::Error> {
-    sqlx::query_as!(
-        Form,
-        r#"
-        SELECT user_id, gender as "gender: Gender", familiar_tags, aspirational_tags, recent_topics,
-               self_traits, ideal_traits, physical_boundary, self_intro, profile_photo_path
-        FROM forms
-        "#,
-    )
-    .fetch_all(db_pool)
-    .await
-}
 
 async fn fetch_all_vetoes(db_pool: &PgPool) -> Result<Vec<Veto>, sqlx::Error> {
     sqlx::query_as!(Veto, "SELECT id, vetoer_id, vetoed_id FROM vetoes")

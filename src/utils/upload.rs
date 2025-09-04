@@ -115,6 +115,9 @@ impl FileManager {
         format!("{user_id}.{extension}")
     }
 
+    /// Parses a UUID from the filename in the given path.
+    ///
+    /// Expects the filename to be in the format `{uuid}.{extension}`.
     pub fn parse_uuid_from_path(path: impl AsRef<Path>) -> Option<uuid::Uuid> {
         path.as_ref()
             .file_stem()

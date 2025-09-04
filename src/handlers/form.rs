@@ -3,6 +3,7 @@
 //! This module implements form endpoints that allow verified users to submit
 //! and retrieve their form data including tags, traits, and profile information.
 
+use std::path::Path;
 use std::sync::Arc;
 
 use axum::{
@@ -18,7 +19,7 @@ use uuid::Uuid;
 
 use crate::middleware::AuthUser;
 use crate::models::{AppState, Form, Gender, UserStatus};
-use crate::utils::upload;
+use crate::utils::{static_object::UPLOAD_DIR, upload};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FormRequest {
@@ -31,14 +32,14 @@ pub struct FormRequest {
     pub ideal_traits: Vec<String>,
     pub physical_boundary: i16,
     pub self_intro: String,
-    pub profile_photo_path: Option<String>,
+    pub profile_photo_filename: Option<String>,
 }
 
 /// Submits or updates the authenticated user's form data.
 ///
 /// POST /api/form FormRequest
 ///
-/// This endpoint validates the form data including tag limits and profile photo paths,
+/// This endpoint validates the form data including tag limits and profile photo filename,
 /// then saves or updates the user's form in the database. Only users with 'verified'
 /// or 'form_completed' status can access this endpoint.
 ///
@@ -86,9 +87,9 @@ pub async fn submit_form(
         return err_resp;
     }
 
-    // 3. Validate profile photo path if provided
-    if let Some(ref photo_path) = payload.profile_photo_path
-        && let Err(resp) = validate_profile_photo_path(photo_path, &user.user_id).await
+    // 3. Validate profile photo filename if provided
+    if let Some(ref filename) = payload.profile_photo_filename
+        && let Err(resp) = validate_profile_photo_filename(filename, &user.user_id).await
     {
         return resp.into_response();
     }
@@ -97,7 +98,7 @@ pub async fn submit_form(
     let result = sqlx::query!(
         r#"
         INSERT INTO forms (user_id, gender, familiar_tags, aspirational_tags, recent_topics,
-                          self_traits, ideal_traits, physical_boundary, self_intro, profile_photo_path)
+                          self_traits, ideal_traits, physical_boundary, self_intro, profile_photo_filename)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         ON CONFLICT (user_id)
         DO UPDATE SET
@@ -109,7 +110,7 @@ pub async fn submit_form(
             ideal_traits = EXCLUDED.ideal_traits,
             physical_boundary = EXCLUDED.physical_boundary,
             self_intro = EXCLUDED.self_intro,
-            profile_photo_path = EXCLUDED.profile_photo_path
+            profile_photo_filename = EXCLUDED.profile_photo_filename
         "#,
         user.user_id,
         payload.gender as Gender,
@@ -120,7 +121,7 @@ pub async fn submit_form(
         &payload.ideal_traits,
         payload.physical_boundary,
         payload.self_intro,
-        payload.profile_photo_path
+        payload.profile_photo_filename
     )
     .execute(&state.db_pool)
     .await;
@@ -207,7 +208,7 @@ pub async fn get_form(
         r#"
         SELECT user_id, gender as "gender: Gender", familiar_tags, aspirational_tags,
                recent_topics, self_traits, ideal_traits, physical_boundary,
-               self_intro, profile_photo_path
+               self_intro, profile_photo_filename
         FROM forms
         WHERE user_id = $1
         "#,
@@ -232,15 +233,15 @@ pub async fn get_form(
     }
 }
 
-async fn validate_profile_photo_path(
-    full_path: &str,
+async fn validate_profile_photo_filename(
+    filename: &str,
     user_id: &Uuid,
 ) -> Result<(), impl IntoResponse> {
-    let photo_uuid = match upload::FileManager::parse_uuid_from_path(full_path) {
+    let photo_uuid = match upload::FileManager::parse_uuid_from_path(filename) {
         Some(uuid) => uuid,
         None => {
-            warn!("Invalid profile photo path format: {}", full_path);
-            return Err((StatusCode::BAD_REQUEST, "Invalid profile photo path"));
+            warn!("Invalid profile photo filename format: {}", filename);
+            return Err((StatusCode::BAD_REQUEST, "Invalid profile photo filename"));
         }
     };
 
@@ -252,7 +253,10 @@ async fn validate_profile_photo_path(
         return Err((StatusCode::BAD_REQUEST, "Photo UUID doesn't match user ID"));
     }
 
-    if !fs::try_exists(full_path).await.unwrap_or(false) {
+    let full_path = Path::new(UPLOAD_DIR.as_str())
+        .join("profile_photos")
+        .join(filename);
+    if !fs::try_exists(&full_path).await.unwrap_or(false) {
         warn!("Profile photo file doesn't exist: {:?}", full_path);
         return Err((StatusCode::BAD_REQUEST, "Profile photo file doesn't exist"));
     }

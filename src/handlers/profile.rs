@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, instrument};
 
 use crate::middleware::AuthUser;
-use crate::models::{AppState, UserStatus};
+use crate::models::{AppState, FinalMatchResponse, UserStatus};
 
 /// Response containing user profile information
 #[derive(Debug, Serialize, Deserialize)]
@@ -23,6 +23,7 @@ pub struct ProfileResponse {
     pub email: String,
     pub status: UserStatus,
     pub grade: Option<String>,
+    pub final_match: Option<FinalMatchResponse>,
 }
 
 /// Gets the authenticated user's profile information.
@@ -69,6 +70,7 @@ pub async fn get_profile(
                     email: row.email,
                     status: row.status,
                     grade: row.grade,
+                    final_match: None, // TODO: Implement final match retrieval
                 }),
             )
                 .into_response()

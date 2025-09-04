@@ -1,7 +1,7 @@
 //! # Profile Photo Upload Handler
 //!
 //! This module implements the HTTP handler for profile photo uploads. Unlike card uploads,
-//! profile photos are only available to verified and form_completed users, and the file path
+//! profile photos are only available to verified and form_completed users, and the filename
 //! is returned in the response rather than stored in the database.
 //!
 //! # Access Control
@@ -33,7 +33,7 @@ use crate::utils::upload::{FileManager, ImageUploadValidator};
 /// Response structure for successful profile photo upload.
 #[derive(Serialize)]
 struct UploadProfilePhotoResponse {
-    file_path: String,
+    filename: String,
 }
 
 /// Uploads a profile photo for verified users.
@@ -130,7 +130,7 @@ pub async fn upload_profile_photo(
         return (StatusCode::BAD_REQUEST, e).into_response();
     }
 
-    // 6. Validate image format using image crate
+    // 6. Validate format using image crate
     let (file_extension, image_format) =
         match ImageUploadValidator::validate_image_format(&file_data) {
             Ok((ext, format)) => (ext, format),
@@ -144,36 +144,33 @@ pub async fn upload_profile_photo(
 
     // 7. Prepare file storage
     let profile_photos_dir = Path::new(UPLOAD_DIR.as_str()).join("profile_photos");
-
-    // Create directory if it doesn't exist
     if let Err(e) = FileManager::ensure_directory_exists(&profile_photos_dir).await {
         error!(error = %e, "Failed to create upload directory");
         return (StatusCode::INTERNAL_SERVER_ERROR, "File system error").into_response();
     }
 
-    // 8. Generate file path
     let filename = FileManager::generate_user_filename(user.user_id, file_extension);
-    let file_path = profile_photos_dir.join(&filename);
+    let full_path = profile_photos_dir.join(&filename);
 
-    debug!(file_path = %file_path.display(), "Saving profile photo");
+    debug!(file_path = %full_path.display(), "Saving profile photo");
 
-    // 9. Write file to disk
-    if let Err(e) = FileManager::save_file(&file_path, &file_data).await {
+    // 8. Write file to disk
+    if let Err(e) = FileManager::save_file(&full_path, &file_data).await {
         error!(error = %e, "Failed to save file");
         return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to save file").into_response();
     }
 
-    // 10. Return success response with file path (no database update)
-    let response = UploadProfilePhotoResponse {
-        file_path: file_path.to_string_lossy().into(),
-    };
-
     info!(
-        file_name = %filename,
         file_size = file_data.len(),
-        file_path = %file_path.display(),
+        file_path = %full_path.display(),
         "Profile photo uploaded successfully"
     );
 
-    (StatusCode::OK, Json(response)).into_response()
+    // Return success response with filename (without database update, which should be handled
+    // when user submits their form)
+    (
+        StatusCode::OK,
+        Json(UploadProfilePhotoResponse { filename }),
+    )
+        .into_response()
 }

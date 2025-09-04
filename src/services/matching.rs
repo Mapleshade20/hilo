@@ -243,18 +243,7 @@ impl MatchingService {
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         info!("Starting match preview generation");
 
-        // Fetch all users who have submitted forms
-        let forms = sqlx::query_as!(
-            Form,
-            r#"
-            SELECT user_id, gender as "gender: Gender", familiar_tags, aspirational_tags, recent_topics,
-                   self_traits, ideal_traits, physical_boundary, self_intro, profile_photo_path
-            FROM forms
-            "#,
-        )
-        .fetch_all(db_pool)
-        .await?;
-
+        let forms = Self::fetch_unmatched_forms(db_pool).await?;
         if forms.is_empty() {
             info!("No forms found, skipping match preview generation");
             return Ok(());
@@ -329,6 +318,22 @@ impl MatchingService {
         }
 
         frequencies
+    }
+
+    /// Fetch all forms that have completed status and are eligible for matching
+    pub(crate) async fn fetch_unmatched_forms(db_pool: &PgPool) -> Result<Vec<Form>, sqlx::Error> {
+        sqlx::query_as!(
+            Form,
+            r#"
+            SELECT user_id, gender as "gender: Gender", familiar_tags, aspirational_tags, recent_topics,
+                   self_traits, ideal_traits, physical_boundary, self_intro, profile_photo_filename
+            FROM forms f
+            JOIN users u ON u.id = f.user_id
+            WHERE u.status = 'form_completed'
+            "#,
+        )
+        .fetch_all(db_pool)
+        .await
     }
 
     /// Store match preview in database using UPSERT operation

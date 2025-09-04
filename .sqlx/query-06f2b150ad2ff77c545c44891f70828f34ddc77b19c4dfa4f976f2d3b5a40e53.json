@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT user_id, gender as \"gender: Gender\", familiar_tags, aspirational_tags, recent_topics,\n               self_traits, ideal_traits, physical_boundary, self_intro, profile_photo_path\n        FROM forms\n        ",
+  "query": "\n            SELECT user_id, gender as \"gender: Gender\", familiar_tags, aspirational_tags, recent_topics,\n                   self_traits, ideal_traits, physical_boundary, self_intro, profile_photo_filename\n            FROM forms f\n            JOIN users u ON u.id = f.user_id\n            WHERE u.status = 'form_completed'\n            ",
   "describe": {
     "columns": [
       {
@@ -60,7 +60,7 @@
       },
       {
         "ordinal": 9,
-        "name": "profile_photo_path",
+        "name": "profile_photo_filename",
         "type_info": "Varchar"
       }
     ],
@@ -80,5 +80,5 @@
       true
     ]
   },
-  "hash": "17d1152334c42157f6567572c97e30a1b91027dbb766ee3a2c7daf482b2e0bac"
+  "hash": "06f2b150ad2ff77c545c44891f70828f34ddc77b19c4dfa4f976f2d3b5a40e53"
 }

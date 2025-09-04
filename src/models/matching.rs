@@ -37,3 +37,19 @@ pub struct ProfilePreview {
     pub email_domain: String,
     pub grade: Option<String>,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FinalMatchResponse {
+    pub is_matched: bool,
+    pub partner_profile: Option<FinalPartnerProfile>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FinalPartnerProfile {
+    pub email_domain: String,
+    pub grade: Option<String>,
+    pub familiar_tags: Vec<String>,
+    pub aspirational_tags: Vec<String>,
+    pub self_intro: String,
+    pub photo_url: Option<String>,
+}

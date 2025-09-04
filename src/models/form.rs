@@ -32,7 +32,7 @@ pub struct Form {
     /// Between 1 and 4
     pub physical_boundary: i16,
     pub self_intro: String,
-    pub profile_photo_path: Option<String>,
+    pub profile_photo_filename: Option<String>,
 }
 
 impl FormRequest {

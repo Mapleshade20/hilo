@@ -14,8 +14,9 @@ This is the backend of a social pairing project. It authenticates male and femal
 
 TODO:
 
-- admin view api: (1) all previews (page=X), (2) all tags: users count and IDF of each tag, (3) all final matches
-- user get/accept/reject final match result api, if reject, revert to form_completed status for both users
+- once a final match is triggered, clear all vetoes and previews in database.
+- add a accept/reject final match result api for `matched` status users; if the user reject, revert to `form_completed` status for them and their partner, clear the previews. (so they and their partner, along with other unmatched users, will wait for the next round)
+- change the get profile api to return the partner's profile (only the fields designated in `FinalPartnerProfile`) if self's status is `matched` or `confirmed`.
 
 ## Notes for new developers
 
@@ -32,3 +33,4 @@ The external email service provider only supports HTTP Basic Authentication ("us
 ## Notes for admin
 
 - The verification code sending API implements a per-email rate limit on server side. But in production environment it's necessary to configure cloud service with a stricter IP-based rate limit for **all** APIs.
+- Check system time before deploy.

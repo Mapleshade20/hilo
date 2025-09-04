@@ -180,12 +180,12 @@ pub async fn upload_card(
         return (StatusCode::INTERNAL_SERVER_ERROR, "File system error").into_response();
     }
     let filename = FileManager::generate_user_filename(user.user_id, file_extension);
-    let file_path = card_photos_dir.join(&filename);
+    let full_path = card_photos_dir.join(&filename);
 
-    debug!(file_path = %file_path.display(), grade = %grade, "Saving file");
+    debug!(file_path = %full_path.display(), grade = %grade, "Saving file");
 
     // 7. Write file to disk
-    if let Err(e) = FileManager::save_file(&file_path, &file_data).await {
+    if let Err(e) = FileManager::save_file(&full_path, &file_data).await {
         error!(error = %e, "Failed to save file");
         return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to save file").into_response();
     }
@@ -193,7 +193,7 @@ pub async fn upload_card(
     // 8. Update database with file path, grade, and status
     match sqlx::query!(
         "UPDATE users SET card_photo_path = $1, grade = $2, status = $3 WHERE id = $4",
-        file_path.to_str(),
+        full_path.to_str(),
         grade,
         UserStatus::VerificationPending as UserStatus,
         user.user_id
@@ -212,7 +212,7 @@ pub async fn upload_card(
         Err(e) => {
             error!(error = %e, "Failed to update database with file path and status");
             // Try to clean up the file
-            FileManager::cleanup_file(&file_path).await;
+            FileManager::cleanup_file(&full_path).await;
             return (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response();
         }
     }

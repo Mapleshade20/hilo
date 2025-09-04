@@ -62,8 +62,8 @@ impl UserStatus {
         matches!(self, UserStatus::Unverified)
     }
 
-    /// Returns true if the user is allowed to fill a form or upload a profile photo.
-    /// Only verified and form_completed users can do such things.
+    /// Returns true if the user is allowed to fill/update a form or upload a profile photo.
+    /// Only verified and form_completed users have access.
     #[inline]
     pub fn can_fill_form(&self) -> bool {
         matches!(self, UserStatus::Verified | UserStatus::FormCompleted)

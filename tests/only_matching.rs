@@ -40,7 +40,7 @@ fn create_test_form(
         ideal_traits,
         physical_boundary,
         self_intro: "Test intro".to_string(),
-        profile_photo_path: None,
+        profile_photo_filename: None,
     }
 }
 

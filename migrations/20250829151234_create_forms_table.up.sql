@@ -23,7 +23,7 @@ CREATE TABLE forms (
 
     -- Section C
     self_intro TEXT NOT NULL,
-    profile_photo_path VARCHAR(255),
+    profile_photo_filename VARCHAR(255),
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

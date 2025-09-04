@@ -24,7 +24,7 @@ export interface FormData {
   ideal_traits: string[];
   physical_boundary: number;
   self_intro: string;
-  profile_photo_path?: string;
+  profile_photo_filename?: string;
 }
 
 export interface ProfilePreview {

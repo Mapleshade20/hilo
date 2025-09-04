@@ -53,10 +53,11 @@ async fn test_upload_profile_photo_success_verified_user(pool: PgPool) {
         .await
         .expect("Failed to parse JSON response");
     assert!(
-        response_json["file_path"]
+        response_json["filename"]
             .as_str()
-            .unwrap()
-            .contains("profile_photos/")
+            .expect("Should return a filename")
+            .ends_with(".png"),
+        "Filename should end with .png"
     );
 
     // Verify user status hasn't changed (should still be 'verified')
