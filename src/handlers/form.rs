@@ -96,11 +96,11 @@ pub async fn submit_form(
     // 4. Insert or update form data
     let result = sqlx::query!(
         r#"
-        INSERT INTO forms (user_id, gender, familiar_tags, aspirational_tags, recent_topics, 
+        INSERT INTO forms (user_id, gender, familiar_tags, aspirational_tags, recent_topics,
                           self_traits, ideal_traits, physical_boundary, self_intro, profile_photo_path)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-        ON CONFLICT (user_id) 
-        DO UPDATE SET 
+        ON CONFLICT (user_id)
+        DO UPDATE SET
             gender = EXCLUDED.gender,
             familiar_tags = EXCLUDED.familiar_tags,
             aspirational_tags = EXCLUDED.aspirational_tags,
@@ -205,10 +205,10 @@ pub async fn get_form(
     let result = sqlx::query_as!(
         Form,
         r#"
-        SELECT user_id, gender as "gender: Gender", familiar_tags, aspirational_tags, 
-               recent_topics, self_traits, ideal_traits, physical_boundary, 
+        SELECT user_id, gender as "gender: Gender", familiar_tags, aspirational_tags,
+               recent_topics, self_traits, ideal_traits, physical_boundary,
                self_intro, profile_photo_path
-        FROM forms 
+        FROM forms
         WHERE user_id = $1
         "#,
         user.user_id

@@ -3,6 +3,7 @@ CREATE TABLE match_previews (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     candidate_ids UUID[] NOT NULL,
+    scores DOUBLE PRECISION[] NOT NULL,
 
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

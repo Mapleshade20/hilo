@@ -337,7 +337,7 @@ async fn fetch_all_forms(db_pool: &PgPool) -> Result<Vec<Form>, sqlx::Error> {
     sqlx::query_as!(
         Form,
         r#"
-        SELECT user_id, gender as "gender: Gender", familiar_tags, aspirational_tags, recent_topics, 
+        SELECT user_id, gender as "gender: Gender", familiar_tags, aspirational_tags, recent_topics,
                self_traits, ideal_traits, physical_boundary, self_intro, profile_photo_path
         FROM forms
         "#,

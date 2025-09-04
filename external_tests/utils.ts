@@ -68,7 +68,7 @@ export function createTestWebpImage(): Uint8Array {
 // Parse leaf tags from tags.json structure
 export function extractLeafTags(tags: TagNode[]): string[] {
   const leafTags: string[] = [];
-  
+
   function traverse(nodes: TagNode[]) {
     for (const node of nodes) {
       if (node.is_matchable && (!node.children || node.children.length === 0)) {
@@ -78,7 +78,7 @@ export function extractLeafTags(tags: TagNode[]): string[] {
       }
     }
   }
-  
+
   traverse(tags);
   return leafTags;
 }
@@ -88,12 +88,12 @@ export function generateRandomTags(availableTags: string[], maxTotal = 8): { fam
   const shuffled = [...availableTags].sort(() => Math.random() - 0.5);
   const totalTags = Math.min(Math.floor(Math.random() * maxTotal) + 1, availableTags.length);
   const selectedTags = shuffled.slice(0, totalTags);
-  
+
   // Split randomly between familiar and aspirational
   const familiarCount = Math.floor(Math.random() * selectedTags.length);
   const familiar = selectedTags.slice(0, familiarCount);
   const aspirational = selectedTags.slice(familiarCount);
-  
+
   return { familiar, aspirational };
 }
 
@@ -102,25 +102,25 @@ export function parseConfigFile(configPath: string): TagConfig {
   try {
     const content = Deno.readTextFileSync(configPath);
     const config: TagConfig = {};
-    
+
     const lines = content.split('\n').filter(line => line.trim() && !line.startsWith('#'));
-    
+
     for (const line of lines) {
       const [tagPart, aspirationalPart] = line.split('|').map(s => s.trim());
       const [tagId, familiarUsersStr] = tagPart.split(':').map(s => s.trim());
-      
-      const familiarUsers = familiarUsersStr ? 
+
+      const familiarUsers = familiarUsersStr ?
         familiarUsersStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n)) : [];
-      
-      const aspirationalUsers = aspirationalPart ? 
+
+      const aspirationalUsers = aspirationalPart ?
         aspirationalPart.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n)) : [];
-      
+
       config[tagId] = {
         familiar: familiarUsers,
         aspirational: aspirationalUsers
       };
     }
-    
+
     return config;
   } catch (error) {
     console.error(`Error reading config file: ${error instanceof Error ? error.message : String(error)}`);

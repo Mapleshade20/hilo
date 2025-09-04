@@ -37,7 +37,7 @@ pub fn generate_verification_email_html(code: &str) -> String {
             <td align="center" style="padding: 20px;">
                 <!-- Main Content Table -->
                 <table width="600" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-                    
+
                     <!-- Header Section -->
                     <tr>
                         <td align="center" style="padding: 40px 20px 20px 20px;">

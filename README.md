@@ -14,14 +14,20 @@ This is the backend of a social pairing project. It authenticates male and femal
 
 TODO:
 
-- store match points in preview db
 - admin view api: (1) all previews (page=X), (2) all tags: users count and IDF of each tag, (3) all final matches
 - user get/accept/reject final match result api, if reject, revert to form_completed status for both users
 
 ## Notes for new developers
 
-- Run `pre-commit install` after cloning the repo
-- The external email service provider only supports HTTP Basic Authentication ("username:apikey") now, and the username defaults to "api" because it's how Mailgun works. In the future more available options will be added.
+This repository uses [pre-commit](https://pre-commit.com/) to check correct formatting, prevent undesired issues and enforce [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/). Make sure you run the following check before PR.
+
+```
+$ pre-commit install --hook-type commit-msg
+$ pre-commit install --hook-type pre-commit
+$ pre-commit run --all-files
+```
+
+The external email service provider only supports HTTP Basic Authentication ("username:apikey") now, and the username defaults to "api" because it's how Mailgun works. In the future more available options will be added.
 
 ## Notes for admin
 

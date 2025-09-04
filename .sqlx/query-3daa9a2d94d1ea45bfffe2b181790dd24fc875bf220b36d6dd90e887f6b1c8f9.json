@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO vetoes (vetoer_id, vetoed_id) VALUES ($1, $2) \n         RETURNING id, vetoer_id, vetoed_id",
+  "query": "INSERT INTO vetoes (vetoer_id, vetoed_id) VALUES ($1, $2)\n         RETURNING id, vetoer_id, vetoed_id",
   "describe": {
     "columns": [
       {
@@ -31,5 +31,5 @@
       false
     ]
   },
-  "hash": "54e8ad8a9fe47b8895092675f6d45212a4ef4359944035aec592eeb54cd54d49"
+  "hash": "3daa9a2d94d1ea45bfffe2b181790dd24fc875bf220b36d6dd90e887f6b1c8f9"
 }

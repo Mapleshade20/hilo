@@ -6,7 +6,7 @@ CREATE TABLE final_matches (
     score DOUBLE PRECISION NOT NULL,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    
+
     -- Ensure each user only appears once in final matches
     -- and prevent duplicate pairs regardless of order
     CHECK(user_a_id != user_b_id),

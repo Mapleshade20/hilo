@@ -175,7 +175,7 @@ async fn create_veto(
 ) -> Result<Veto, sqlx::Error> {
     sqlx::query_as!(
         Veto,
-        "INSERT INTO vetoes (vetoer_id, vetoed_id) VALUES ($1, $2) 
+        "INSERT INTO vetoes (vetoer_id, vetoed_id) VALUES ($1, $2)
          RETURNING id, vetoer_id, vetoed_id",
         vetoer_id,
         vetoed_id
@@ -216,7 +216,7 @@ async fn fetch_profile_previews(
 ) -> Result<Vec<ProfilePreview>, sqlx::Error> {
     let result = sqlx::query!(
         r#"
-        SELECT 
+        SELECT
             f.familiar_tags,
             f.aspirational_tags,
             f.recent_topics,

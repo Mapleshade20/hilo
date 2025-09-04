@@ -30,10 +30,6 @@ impl MatchingService {
 
         // Gender Filter: Must be one male and one female
         if !Self::is_gender_compatible(form_a.gender, form_b.gender) {
-            trace!(
-                "Gender incompatible: {:?} and {:?}",
-                form_a.gender, form_b.gender
-            );
             return -1.0;
         }
 
@@ -128,11 +124,11 @@ impl MatchingService {
         let direct_matches: HashSet<_> = set_a.intersection(&set_b).collect();
         for tag in &direct_matches {
             score += Self::calculate_idf_score(tag, tag_frequencies, total_user_count);
-            trace!(
-                "Direct tag match: {} (IDF: {})",
-                tag,
-                Self::calculate_idf_score(tag, tag_frequencies, total_user_count)
-            );
+            // trace!(
+            //     "Direct tag match: {} (IDF: {})",
+            //     tag,
+            //     Self::calculate_idf_score(tag, tag_frequencies, total_user_count)
+            // );
         }
 
         // Indirect matches (common ancestors)
@@ -163,14 +159,14 @@ impl MatchingService {
                     );
                     score += ancestor_score * decay_factor;
 
-                    trace!(
-                        "Indirect tag match: {} <-> {} via {} (IDF: {}, decayed: {})",
-                        tag_a,
-                        tag_b,
-                        common_ancestor,
-                        ancestor_score,
-                        ancestor_score * decay_factor
-                    );
+                    // trace!(
+                    //     "Indirect tag match: {} <-> {} via {} (IDF: {}, decayed: {})",
+                    //     tag_a,
+                    //     tag_b,
+                    //     common_ancestor,
+                    //     ancestor_score,
+                    //     ancestor_score * decay_factor
+                    // );
 
                     matched_ancestors.insert(common_ancestor);
                 }
@@ -230,12 +226,12 @@ impl MatchingService {
         let trait_match_points = *TRAIT_MATCH_POINTS;
         let total_matches = (a_satisfied + b_satisfied) as f64;
 
-        trace!(
-            "Trait compatibility: A satisfied: {}, B satisfied: {}, total score: {}",
-            a_satisfied,
-            b_satisfied,
-            total_matches * trait_match_points
-        );
+        // trace!(
+        //     "Trait compatibility: A satisfied: {}, B satisfied: {}, total score: {}",
+        //     a_satisfied,
+        //     b_satisfied,
+        //     total_matches * trait_match_points
+        // );
 
         total_matches * trait_match_points
     }
@@ -251,7 +247,7 @@ impl MatchingService {
         let forms = sqlx::query_as!(
             Form,
             r#"
-            SELECT user_id, gender as "gender: Gender", familiar_tags, aspirational_tags, recent_topics, 
+            SELECT user_id, gender as "gender: Gender", familiar_tags, aspirational_tags, recent_topics,
                    self_traits, ideal_traits, physical_boundary, self_intro, profile_photo_path
             FROM forms
             "#,
@@ -296,19 +292,19 @@ impl MatchingService {
             // Sort by score (descending) and take top N candidates
             candidate_scores
                 .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-            let top_candidates: Vec<Uuid> = candidate_scores
+            let (top_candidates, top_scores): (Vec<_>, Vec<_>) = candidate_scores
                 .into_iter()
                 .take(MAX_PREVIEW_CANDIDATES)
-                .map(|(user_id, _)| user_id)
-                .collect();
+                .unzip();
 
             // Store in database using UPSERT
-            Self::store_match_preview(db_pool, user_form.user_id, &top_candidates).await?;
+            Self::store_match_preview(db_pool, user_form.user_id, &top_candidates, &top_scores)
+                .await?;
 
             trace!(
                 user_id = %user_form.user_id,
-                "Generated {} match previews for user",
-                top_candidates.len()
+                "Generated {} match previews for user, scores: {:?}",
+                top_candidates.len(), top_scores
             );
         }
 
@@ -340,15 +336,18 @@ impl MatchingService {
         db_pool: &PgPool,
         user_id: Uuid,
         candidate_ids: &[Uuid],
+        scores: &[f64],
     ) -> Result<(), sqlx::Error> {
         sqlx::query!(
-            "INSERT INTO match_previews (user_id, candidate_ids)
-             VALUES ($1, $2)
+            "INSERT INTO match_previews (user_id, candidate_ids, scores)
+             VALUES ($1, $2, $3)
              ON CONFLICT (user_id)
-             DO UPDATE SET 
-                candidate_ids = EXCLUDED.candidate_ids",
+             DO UPDATE SET
+                candidate_ids = EXCLUDED.candidate_ids,
+                scores = EXCLUDED.scores",
             user_id,
-            candidate_ids
+            candidate_ids,
+            scores
         )
         .execute(db_pool)
         .await?;

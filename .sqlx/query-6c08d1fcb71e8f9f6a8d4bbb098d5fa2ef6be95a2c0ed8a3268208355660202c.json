@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT \n            f.familiar_tags,\n            f.aspirational_tags,\n            f.recent_topics,\n            u.email,\n            u.grade\n        FROM match_previews mp\n        JOIN forms f ON f.user_id = ANY(mp.candidate_ids)\n        JOIN users u ON u.id = f.user_id\n        WHERE mp.user_id = $1\n        ",
+  "query": "\n        SELECT\n            f.familiar_tags,\n            f.aspirational_tags,\n            f.recent_topics,\n            u.email,\n            u.grade\n        FROM match_previews mp\n        JOIN forms f ON f.user_id = ANY(mp.candidate_ids)\n        JOIN users u ON u.id = f.user_id\n        WHERE mp.user_id = $1\n        ",
   "describe": {
     "columns": [
       {
@@ -42,5 +42,5 @@
       true
     ]
   },
-  "hash": "836aa68c26f49e622c276f12f22b5ab91fdd3d73427f908f07ab8dfe72338d7b"
+  "hash": "6c08d1fcb71e8f9f6a8d4bbb098d5fa2ef6be95a2c0ed8a3268208355660202c"
 }

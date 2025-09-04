@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO refresh_tokens (user_id, token_hash, expires_at)\n            VALUES ($1, $2, to_timestamp($3))\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Float8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "60468fa3c200846ef18da5102f33880da5790fb5022afd42cd432baf4c6d0004"
+}

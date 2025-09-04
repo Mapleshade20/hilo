@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT user_id, gender as \"gender: Gender\", familiar_tags, aspirational_tags, \n               recent_topics, self_traits, ideal_traits, physical_boundary, \n               self_intro, profile_photo_path\n        FROM forms \n        WHERE user_id = $1\n        ",
+  "query": "\n            SELECT user_id, gender as \"gender: Gender\", familiar_tags, aspirational_tags, recent_topics,\n                   self_traits, ideal_traits, physical_boundary, self_intro, profile_photo_path\n            FROM forms\n            ",
   "describe": {
     "columns": [
       {
@@ -65,9 +65,7 @@
       }
     ],
     "parameters": {
-      "Left": [
-        "Uuid"
-      ]
+      "Left": []
     },
     "nullable": [
       false,
@@ -82,5 +80,5 @@
       true
     ]
   },
-  "hash": "ca1527bdc1f715ed4852d8f4f00fa84863f8dd840ffc7bc33732f9c3b8670e82"
+  "hash": "adbcbb92820c5db56fa0343728490ab1fcc000513dc2a67caf47dae736d6c4fa"
 }

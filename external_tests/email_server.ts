@@ -20,11 +20,11 @@ async function handleEmailRequest(request: Request): Promise<Response> {
   try {
     const emailData: VerificationEmail = await request.json();
     console.log(`📧 Received email for: ${emailData.to}`);
-    
+
     if (emailData.content && emailData.content.length > 0) {
       const htmlContent = emailData.content[0].value;
       const code = extractVerificationCode(htmlContent);
-      
+
       if (code) {
         verificationCodes.set(emailData.to, code);
         console.log(`🔑 Extracted verification code for ${emailData.to}: ${code}`);
@@ -32,7 +32,7 @@ async function handleEmailRequest(request: Request): Promise<Response> {
         console.log(`❌ Could not extract verification code from email to ${emailData.to}`);
       }
     }
-    
+
     return new Response("OK", { status: 200 });
   } catch (error) {
     console.error("Error processing email:", error);
@@ -44,17 +44,17 @@ async function handleEmailRequest(request: Request): Promise<Response> {
 export function startEmailServer(): Promise<Deno.HttpServer> {
   const handler = (request: Request): Promise<Response> => {
     const url = new URL(request.url);
-    
+
     if (url.pathname === "/" && request.method === "POST") {
       return handleEmailRequest(request);
     }
-    
+
     return Promise.resolve(new Response("Not Found", { status: 404 }));
   };
 
   console.log(`🚀 Starting email server on port ${PORT}...`);
   const server = Deno.serve({ port: PORT }, handler);
-  
+
   return Promise.resolve(server);
 }
 
@@ -71,7 +71,7 @@ export function clearVerificationCodes(): void {
 // Wait for verification code to arrive
 export async function waitForVerificationCode(email: string, timeoutMs = 5000): Promise<string> {
   const startTime = Date.now();
-  
+
   while (Date.now() - startTime < timeoutMs) {
     const code = getVerificationCode(email);
     if (code) {
@@ -79,6 +79,6 @@ export async function waitForVerificationCode(email: string, timeoutMs = 5000): 
     }
     await new Promise(resolve => setTimeout(resolve, 100));
   }
-  
+
   throw new Error(`Timeout waiting for verification code for ${email}`);
 }

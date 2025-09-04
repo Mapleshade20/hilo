@@ -41,7 +41,7 @@ async function verifyCode(email: string, code: string): Promise<AuthResponse> {
 // Upload card with image and grade
 async function uploadCard(accessToken: string, grade: string): Promise<void> {
   const imageData = createTestWebpImage();
-  
+
   const formData = new FormData();
   formData.append("card", new Blob([imageData], { type: "image/webp" }), "card.webp");
   formData.append("grade", grade);
@@ -128,8 +128,8 @@ export async function setupUser(userId: number): Promise<User> {
 // Setup multiple users concurrently
 export async function setupUsers(userCount: number): Promise<User[]> {
   console.log(`\n🚀 Setting up ${userCount} users...`);
-  
-  const setupPromises = Array.from({ length: userCount }, (_, i) => 
+
+  const setupPromises = Array.from({ length: userCount }, (_, i) =>
     setupUser(i + 1)
   );
 

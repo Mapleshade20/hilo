@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO match_previews (user_id, candidate_ids, scores)\n             VALUES ($1, $2, $3)\n             ON CONFLICT (user_id)\n             DO UPDATE SET\n                candidate_ids = EXCLUDED.candidate_ids,\n                scores = EXCLUDED.scores",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray",
+        "Float8Array"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "82a2af5d729b4abf0c99cdc6abdb039d80e6794cf73172e1e317bfefe9b3dbbf"
+}

@@ -7,7 +7,7 @@ CREATE TABLE forms (
     -- Section A
     gender gender NOT NULL,
     -- wechat_id goes here in frontend but is stored in users table
-    
+
     -- Section B
     -- B1: familiar hobbies
     familiar_tags TEXT[] NOT NULL,

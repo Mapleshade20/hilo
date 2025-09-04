@@ -136,7 +136,7 @@ impl JwtService {
         // Store refresh token in database
         match sqlx::query!(
             r#"
-            INSERT INTO refresh_tokens (user_id, token_hash, expires_at) 
+            INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
             VALUES ($1, $2, to_timestamp($3))
             "#,
             user_id,
@@ -228,7 +228,7 @@ impl JwtService {
         let token_record = match sqlx::query!(
             r#"
             SELECT user_id, expires_at
-            FROM refresh_tokens 
+            FROM refresh_tokens
             WHERE token_hash = $1 AND expires_at > NOW()
             "#,
             refresh_token_hash

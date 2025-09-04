@@ -3,13 +3,13 @@ import { startEmailServer, clearVerificationCodes } from "./email_server.ts";
 import { setupUsers } from "./user_setup.ts";
 import { loadTags, submitAllForms } from "./form_generator.ts";
 import { User, ProfilePreview, TestMode } from "./types.ts";
-import { 
-  printHeader, 
-  printUserInfo, 
-  printMatchPreview, 
-  colors, 
-  colorPrint, 
-  sleep 
+import {
+  printHeader,
+  printUserInfo,
+  printMatchPreview,
+  colors,
+  colorPrint,
+  sleep
 } from "./utils.ts";
 
 const HILO_API_URL = "http://127.0.0.1:8090";
@@ -18,7 +18,7 @@ const ADMIN_API_URL = "http://127.0.0.1:8091";
 // Trigger match preview update via admin API
 async function updateMatchPreviews(): Promise<void> {
   console.log(`\n🔄 Triggering match preview update...`);
-  
+
   const response = await fetch(`${ADMIN_API_URL}/api/admin/update-previews`, {
     method: "POST",
     headers: {
@@ -57,19 +57,19 @@ async function displayMatchResults(users: User[]): Promise<void> {
   for (const user of users) {
     try {
       printUserInfo(user.id, user.email, user.gender);
-      
+
       const previews = await getMatchPreviews(user);
-      
+
       if (previews.length === 0) {
         colorPrint(`  No matches found 😔`, colors.dim);
       } else {
         colorPrint(`  Found ${previews.length} match${previews.length > 1 ? "es" : ""} 🎉`, colors.green);
-        
+
         previews.forEach((preview, index) => {
           printMatchPreview(preview, index);
         });
       }
-      
+
       console.log(); // Empty line between users
     } catch (error) {
       colorPrint(`  ❌ Error fetching matches: ${error instanceof Error ? error.message : String(error)}`, colors.red);
@@ -80,7 +80,7 @@ async function displayMatchResults(users: User[]): Promise<void> {
 // Parse command line arguments
 function parseArgs(): { mode: TestMode; userCount: number; configPath?: string } {
   const args = Deno.args;
-  
+
   let mode: TestMode = "random";
   let userCount = 6;
   let configPath: string | undefined;
@@ -113,7 +113,7 @@ function parseArgs(): { mode: TestMode; userCount: number; configPath?: string }
 // Main function
 async function main(): Promise<void> {
   const { mode, userCount, configPath } = parseArgs();
-  
+
   printHeader("HILO MATCHING SIMULATION");
   console.log(`📊 Mode: ${mode}`);
   console.log(`👥 Users: ${userCount}`);
@@ -141,7 +141,7 @@ async function main(): Promise<void> {
 
     // Step 5: Update match previews
     await updateMatchPreviews();
-    
+
     // Give matching algorithm time to complete
     console.log("⏳ Waiting for matching algorithm to complete...");
     await sleep(2000);
@@ -151,10 +151,10 @@ async function main(): Promise<void> {
 
     printHeader("SIMULATION COMPLETE");
     colorPrint("🎉 All operations completed successfully!", colors.green);
-    
+
     // Clean shutdown
     emailServer.shutdown();
-    
+
   } catch (error) {
     colorPrint(`❌ Simulation failed: ${error instanceof Error ? error.message : String(error)}`, colors.red);
     console.error(error);
