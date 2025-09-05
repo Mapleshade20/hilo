@@ -64,7 +64,7 @@ pub async fn submit_form(
 ) -> impl IntoResponse {
     debug!("Processing form submission request");
 
-    // 1. Check user status - only verified and form_completed users can submit
+    // Check user status - only verified and form_completed users can submit
     let user_status = match UserStatus::query(&state.db_pool, &user.user_id).await {
         Ok(status) => status,
         Err(resp) => {
@@ -82,19 +82,19 @@ pub async fn submit_form(
             .into_response();
     }
 
-    // 2. Validate each field of the form
+    // Validate each field of the form
     if let Some(err_resp) = payload.validate_request(state.tag_system) {
         return err_resp;
     }
 
-    // 3. Validate profile photo filename if provided
+    // Validate profile photo filename if provided
     if let Some(ref filename) = payload.profile_photo_filename
         && let Err(resp) = validate_profile_photo_filename(filename, &user.user_id).await
     {
         return resp.into_response();
     }
 
-    // 4. Insert or update form data
+    // Insert or update form data
     let result = sqlx::query!(
         r#"
         INSERT INTO forms (user_id, gender, familiar_tags, aspirational_tags, recent_topics,
@@ -237,6 +237,19 @@ async fn validate_profile_photo_filename(
     filename: &str,
     user_id: &Uuid,
 ) -> Result<(), impl IntoResponse> {
+    // Security checks: ensure filename is not malicious
+    if filename.contains("..")
+        || !filename
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '.')
+    {
+        warn!("Profile photo filename contains forbidden characters");
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Profile photo filename contains forbidden characters",
+        ));
+    }
+
     let photo_uuid = match upload::FileManager::parse_uuid_from_path(filename) {
         Some(uuid) => uuid,
         None => {
