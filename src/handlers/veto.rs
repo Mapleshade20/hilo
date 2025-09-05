@@ -25,21 +25,13 @@ pub async fn get_previews(
     State(state): State<Arc<AppState>>,
     Extension(user): Extension<AuthUser>,
 ) -> Result<Json<Vec<ProfilePreview>>, Response> {
-    let user_id = user.user_id;
-
-    debug!("Getting match previews for user {}", user_id);
-
-    match fetch_profile_previews(&state.db_pool, user_id).await {
+    match fetch_profile_previews(&state.db_pool, user.user_id).await {
         Ok(profiles) => {
-            info!(
-                "Found {} match previews for user {}",
-                profiles.len(),
-                user_id
-            );
+            info!("Found {} match previews for user", profiles.len());
             Ok(Json(profiles))
         }
         Err(e) => {
-            error!("Failed to fetch match previews for user {}: {}", user_id, e);
+            error!("Failed to fetch match previews for user: {}", e);
             Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Failed to fetch match previews",
@@ -54,6 +46,7 @@ pub async fn get_previews(
     skip_all,
     fields(
         user_id = %user.user_id,
+        target_id = %request.vetoed_id,
         request_id = %uuid::Uuid::new_v4()
     )
 )]
@@ -65,28 +58,23 @@ pub async fn add_veto(
     let vetoer_id = user.user_id;
     let vetoed_id = request.vetoed_id;
 
-    debug!("User {} vetoing user {}", vetoer_id, vetoed_id);
-
     // Prevent self-vetoing
     if vetoer_id == vetoed_id {
-        warn!("User {} attempted to veto themselves", vetoer_id);
+        warn!("User attempted to veto themselves");
         return Err((StatusCode::BAD_REQUEST, "Cannot veto yourself").into_response());
     }
 
     match create_veto(&state.db_pool, vetoer_id, vetoed_id).await {
         Ok(_) => {
-            info!("User {} successfully vetoed user {}", vetoer_id, vetoed_id);
+            info!("User successfully vetoed target user");
             Ok(StatusCode::CREATED)
         }
         Err(e) => {
             if e.to_string().contains("duplicate key") {
-                debug!("User {} already vetoed user {}", vetoer_id, vetoed_id);
+                debug!("User already vetoed target user");
                 Ok(StatusCode::OK) // Idempotent - already vetoed
             } else {
-                error!(
-                    "Failed to create veto from {} to {}: {}",
-                    vetoer_id, vetoed_id, e
-                );
+                error!("Failed to create veto: {}", e);
                 Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to create veto").into_response())
             }
         }
@@ -98,6 +86,7 @@ pub async fn add_veto(
     skip_all,
     fields(
         user_id = %user.user_id,
+        target_id = %request.vetoed_id,
         request_id = %uuid::Uuid::new_v4()
     )
 )]
@@ -109,29 +98,18 @@ pub async fn remove_veto(
     let vetoer_id = user.user_id;
     let vetoed_id = request.vetoed_id;
 
-    debug!("User {} removing veto for user {}", vetoer_id, vetoed_id);
-
     match delete_veto(&state.db_pool, vetoer_id, vetoed_id).await {
         Ok(rows_affected) => {
             if rows_affected > 0 {
-                info!(
-                    "User {} successfully removed veto for user {}",
-                    vetoer_id, vetoed_id
-                );
+                info!("User successfully removed veto for target user",);
                 Ok(StatusCode::NO_CONTENT)
             } else {
-                debug!(
-                    "No veto found to remove between {} and {}",
-                    vetoer_id, vetoed_id
-                );
+                debug!("No veto found to remove between user and target",);
                 Ok(StatusCode::NOT_FOUND)
             }
         }
         Err(e) => {
-            error!(
-                "Failed to remove veto from {} to {}: {}",
-                vetoer_id, vetoed_id, e
-            );
+            error!("Failed to remove veto: {}", e);
             Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to remove veto").into_response())
         }
     }
@@ -149,18 +127,14 @@ pub async fn get_vetoes(
     State(state): State<Arc<AppState>>,
     Extension(user): Extension<AuthUser>,
 ) -> Result<Json<Vec<Uuid>>, Response> {
-    let user_id = user.user_id;
-
-    debug!("Getting vetoes for user {}", user_id);
-
-    match fetch_user_vetoes(&state.db_pool, user_id).await {
+    match fetch_user_vetoes(&state.db_pool, user.user_id).await {
         Ok(vetoes) => {
             let vetoed_ids: Vec<Uuid> = vetoes.into_iter().map(|v| v.vetoed_id).collect();
-            info!("Found {} vetoes for user {}", vetoed_ids.len(), user_id);
+            info!("Found {} vetoes for user", vetoed_ids.len());
             Ok(Json(vetoed_ids))
         }
         Err(e) => {
-            error!("Failed to fetch vetoes for user {}: {}", user_id, e);
+            error!("Failed to fetch vetoes for user: {}", e);
             Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to fetch vetoes").into_response())
         }
     }

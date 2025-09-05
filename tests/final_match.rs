@@ -213,6 +213,27 @@ async fn test_reject_final_match(pool: sqlx::PgPool) {
     let (male_token, female_token) =
         setup_two_matched_users(&client, &address, &mock_emailer).await;
 
+    // Get the partner photo URL from profile
+    let male_response = client
+        .get(format!("{address}/api/profile"))
+        .header("Authorization", format!("Bearer {male_token}"))
+        .send()
+        .await
+        .expect("Failed to get male profile");
+    let male_profile: serde_json::Value =
+        male_response.json().await.expect("Failed to parse profile");
+    let male_partner_photo_url = male_profile["final_match"]["photo_url"]
+        .as_str()
+        .expect("Male should have partner photo URL");
+
+    // Test that photo is accessible before rejection
+    let status = access_partner_image(&client, &address, &male_token, male_partner_photo_url).await;
+    assert_eq!(
+        status,
+        reqwest::StatusCode::OK,
+        "Should access partner image"
+    );
+
     // Female user rejects the match
     let response = client
         .post(format!("{address}/api/final-match/reject"))
@@ -265,8 +286,7 @@ async fn test_reject_final_match(pool: sqlx::PgPool) {
     );
 
     // Test that partner image access is now denied
-    let fake_image_url = "/api/images/partner/550e8400-e29b-41d4-a716-446655440000.png";
-    let status = access_partner_image(&client, &address, &male_token, fake_image_url).await;
+    let status = access_partner_image(&client, &address, &male_token, male_partner_photo_url).await;
     assert_eq!(
         status,
         reqwest::StatusCode::FORBIDDEN,

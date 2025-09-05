@@ -159,7 +159,7 @@ pub async fn get_access_token(
 /// Creates a simple 1x1 PNG image and returns its byte representation.
 pub fn create_test_image() -> Vec<u8> {
     // Create a simple 1x1 PNG image
-    let png_data = vec![
+    vec![
         0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
         0x00, 0x00, 0x00, 0x0D, // IHDR chunk length
         0x49, 0x48, 0x44, 0x52, // IHDR
@@ -175,8 +175,7 @@ pub fn create_test_image() -> Vec<u8> {
         0x00, 0x00, 0x00, 0x00, // IEND chunk length
         0x49, 0x45, 0x4E, 0x44, // IEND
         0xAE, 0x42, 0x60, 0x82, // CRC
-    ];
-    png_data
+    ]
 }
 
 pub fn create_male_form_submission() -> serde_json::Value {

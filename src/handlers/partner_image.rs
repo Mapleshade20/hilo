@@ -26,7 +26,7 @@ use crate::utils::static_object::UPLOAD_DIR;
 /// This endpoint serves profile photos for matched partners only.
 /// It requires authentication and validates that the requesting user
 /// is actually matched with the user whose photo is being requested.
-#[instrument(skip_all)]
+#[instrument(skip_all, fields(request_id = %uuid::Uuid::new_v4()))]
 pub async fn serve_partner_image(
     State(state): State<Arc<AppState>>,
     Extension(requested_id): Extension<Uuid>,

@@ -1,15 +1,8 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use axum::{
-    Json, Router,
-    extract::State,
-    http::StatusCode,
-    response::{IntoResponse, Response},
-    routing::post,
-};
+use axum::{Json, Router, extract::State, http::StatusCode, response::IntoResponse, routing::post};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use sqlx::PgPool;
 use tracing::{error, info, instrument, warn};
 use uuid::Uuid;
@@ -33,9 +26,14 @@ pub struct VerifyUserRequest {
 #[derive(Debug, Serialize)]
 pub struct VerifyUserResponse {
     pub success: bool,
-    pub message: String,
+    pub message: &'static str,
     pub user_id: Uuid,
-    pub new_status: UserStatus,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TriggerResponse {
+    pub success: bool,
+    pub message: &'static str,
 }
 
 pub struct AdminState {
@@ -59,55 +57,54 @@ pub fn admin_router(db_pool: PgPool) -> Router {
 
 /// Admin endpoint to trigger the final matching algorithm
 #[instrument(skip_all, fields(request_id = %uuid::Uuid::new_v4()))]
-pub async fn trigger_final_matching(
-    State(state): State<Arc<AdminState>>,
-) -> Result<Json<serde_json::Value>, Response> {
+pub async fn trigger_final_matching(State(state): State<Arc<AdminState>>) -> impl IntoResponse {
     match execute_final_matching(&state.db_pool, state.tag_system).await {
         Ok(matches) => {
             info!("Final matching completed: {} pairs", matches.len());
-            Ok(Json(json!({
-                "success": true,
-                "message": format!("Successfully created {} final matches", matches.len()),
-                "match_count": matches.len()
-            })))
+            (
+                StatusCode::OK,
+                Json(TriggerResponse {
+                    success: true,
+                    message: "Final matching completed successfully",
+                }),
+            )
         }
         Err(e) => {
             error!("Final matching failed: {}", e);
-            Err((
+            (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({
-                    "success": false,
-                    "error": "Failed to execute final matching"
-                })),
+                Json(TriggerResponse {
+                    success: false,
+                    message: "Final matching failed",
+                }),
             )
-                .into_response())
         }
     }
 }
 
 /// Admin endpoint to manually update match previews
 #[instrument(skip_all, fields(request_id = %uuid::Uuid::new_v4()))]
-pub async fn update_match_previews(
-    State(state): State<Arc<AdminState>>,
-) -> Result<Json<serde_json::Value>, Response> {
+pub async fn update_match_previews(State(state): State<Arc<AdminState>>) -> impl IntoResponse {
     match MatchingService::generate_match_previews(&state.db_pool, state.tag_system).await {
         Ok(_) => {
             info!("Match previews update completed successfully");
-            Ok(Json(json!({
-                "success": true,
-                "message": "Match previews updated successfully"
-            })))
+            (
+                StatusCode::OK,
+                Json(TriggerResponse {
+                    success: true,
+                    message: "Match previews updated successfully",
+                }),
+            )
         }
         Err(e) => {
             error!("Match previews update failed: {}", e);
-            Err((
+            (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({
-                    "success": false,
-                    "error": "Failed to update match previews"
-                })),
+                Json(TriggerResponse {
+                    success: false,
+                    message: "Match previews update failed",
+                }),
             )
-                .into_response())
         }
     }
 }
@@ -117,94 +114,111 @@ pub async fn update_match_previews(
 pub async fn verify_user(
     State(state): State<Arc<AdminState>>,
     Json(payload): Json<VerifyUserRequest>,
-) -> Result<Json<VerifyUserResponse>, Response> {
+) -> impl IntoResponse {
     // Validate target status
     if !matches!(
         payload.status,
         UserStatus::Verified | UserStatus::Unverified
     ) {
         warn!("Invalid target status: {:?}", payload.status);
-        return Err((
+        return (
             StatusCode::BAD_REQUEST,
-            Json(json!({
-                "success": false,
-                "error": "Target status must be either 'verified' or 'unverified'"
-            })),
-        )
-            .into_response());
+            Json(VerifyUserResponse {
+                success: false,
+                message: "Invalid target status",
+                user_id: Uuid::nil(),
+            }),
+        );
     }
 
-    // 3. Get user ID (prioritize user_id over email)
+    // Get user ID (prioritize user_id over email)
     let user_id = if let Some(id) = payload.user_id {
         id
     } else if let Some(email) = &payload.email {
         match get_user_id_by_email(&state.db_pool, email).await {
             Ok(id) => id,
-            Err(e) => {
+            Err(code) => {
                 warn!("User not found by email: {}", email);
-                return Err(e);
+                return (
+                    code,
+                    Json(VerifyUserResponse {
+                        success: false,
+                        message: "User not found by email",
+                        user_id: Uuid::nil(),
+                    }),
+                );
             }
         }
     } else {
         warn!("Neither user_id nor email provided");
-        return Err((
+        return (
             StatusCode::BAD_REQUEST,
-            Json(json!({
-                "success": false,
-                "error": "Either user_id or email must be provided"
-            })),
-        )
-            .into_response());
+            Json(VerifyUserResponse {
+                success: false,
+                message: "Must provide either user_id or email",
+                user_id: Uuid::nil(),
+            }),
+        );
     };
 
-    // 4. Check current user status: should not be 'unverified'
+    // Check current user status: should not be 'unverified'
     let current_status = match get_user_status(&state.db_pool, &user_id).await {
         Ok(status) => status,
-        Err(e) => {
-            error!("Failed to get user status for user_id: {}", user_id);
-            return Err(e);
+        Err(code) => {
+            error!(%user_id, "Failed to get user status for user_id");
+            return (
+                code,
+                Json(VerifyUserResponse {
+                    success: false,
+                    message: "Failed to get user status",
+                    user_id,
+                }),
+            );
         }
     };
-
     if current_status == UserStatus::Unverified {
         warn!(
-            "User {} status is {:?}, expected verification_pending",
-            user_id, current_status
+            %user_id,
+            "User status is {:?}, expected verification_pending",
+            current_status
         );
-        return Err((
+        return (
             StatusCode::BAD_REQUEST,
-            Json(json!({
-                "success": false,
-                "error": format!("User status is '{}', expected 'verification_pending'", current_status)
-            })),
-        )
-            .into_response());
+            Json(VerifyUserResponse {
+                success: false,
+                message: "Cannot change status of an unverified user",
+                user_id,
+            }),
+        );
     }
 
-    // 5. Update user status
+    // Update user status
     match update_user_status(&state.db_pool, &user_id, payload.status).await {
         Ok(_) => {
             info!(
-                "Successfully updated user {} status from {:?} to {:?}",
-                user_id, current_status, payload.status
+                %user_id,
+                "Successfully updated user status from {:?} to {:?}",
+                current_status, payload.status
             );
-            Ok(Json(VerifyUserResponse {
-                success: true,
-                message: format!("User status updated to '{}'", payload.status),
-                user_id,
-                new_status: payload.status,
-            }))
+            (
+                StatusCode::OK,
+                Json(VerifyUserResponse {
+                    success: true,
+                    message: "User status updated successfully",
+                    user_id,
+                }),
+            )
         }
         Err(e) => {
             error!("Failed to update user status: {}", e);
-            Err((
+            (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({
-                    "success": false,
-                    "error": "Failed to update user status"
-                })),
+                Json(VerifyUserResponse {
+                    success: false,
+                    message: "Failed to update user status",
+                    user_id,
+                }),
             )
-                .into_response())
         }
     }
 }
@@ -214,20 +228,13 @@ async fn execute_final_matching(
     db_pool: &PgPool,
     tag_system: &TagSystem,
 ) -> Result<Vec<FinalMatch>, Box<dyn std::error::Error + Send + Sync>> {
-    // Clear all vetoes and previews before starting final matching
-    info!("Clearing all vetoes and match previews");
-    sqlx::query!("DELETE FROM vetoes").execute(db_pool).await?;
-    sqlx::query!("DELETE FROM match_previews")
-        .execute(db_pool)
-        .await?;
-
     // Fetch all users with submitted forms
     let forms = MatchingService::fetch_unmatched_forms(db_pool).await?;
     if forms.is_empty() {
         return Ok(vec![]);
     }
 
-    // Fetch all veto records (should be empty after clearing)
+    // Fetch all veto records
     let vetoes = fetch_all_vetoes(db_pool).await?;
     let veto_map = build_veto_map(&vetoes);
 
@@ -299,6 +306,13 @@ async fn execute_final_matching(
         .execute(db_pool)
         .await?;
     }
+
+    // Clear all vetoes and previews after final matching
+    info!("Clearing all vetoes and match previews");
+    sqlx::query!("DELETE FROM vetoes").execute(db_pool).await?;
+    sqlx::query!("DELETE FROM match_previews")
+        .execute(db_pool)
+        .await?;
 
     Ok(final_matches)
 }
@@ -379,33 +393,19 @@ async fn create_final_match(
 // Helper functions for user verification
 
 /// Get user ID by email
-async fn get_user_id_by_email(db_pool: &PgPool, email: &str) -> Result<Uuid, Response> {
+async fn get_user_id_by_email(db_pool: &PgPool, email: &str) -> Result<Uuid, StatusCode> {
     match sqlx::query_scalar!("SELECT id FROM users WHERE email = $1", email)
         .fetch_optional(db_pool)
         .await
     {
         Ok(Some(user_id)) => Ok(user_id),
-        Ok(None) => Err((
-            StatusCode::NOT_FOUND,
-            Json(json!({
-                "success": false,
-                "error": "User not found"
-            })),
-        )
-            .into_response()),
-        Err(_) => Err((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({
-                "success": false,
-                "error": "Database error"
-            })),
-        )
-            .into_response()),
+        Ok(None) => Err(StatusCode::NOT_FOUND),
+        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
 /// Get current user status
-async fn get_user_status(db_pool: &PgPool, user_id: &Uuid) -> Result<UserStatus, Response> {
+async fn get_user_status(db_pool: &PgPool, user_id: &Uuid) -> Result<UserStatus, StatusCode> {
     match sqlx::query!(
         r#"SELECT status as "status: UserStatus" FROM users WHERE id = $1"#,
         user_id
@@ -414,22 +414,8 @@ async fn get_user_status(db_pool: &PgPool, user_id: &Uuid) -> Result<UserStatus,
     .await
     {
         Ok(Some(row)) => Ok(row.status),
-        Ok(None) => Err((
-            StatusCode::NOT_FOUND,
-            Json(json!({
-                "success": false,
-                "error": "User not found"
-            })),
-        )
-            .into_response()),
-        Err(_) => Err((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({
-                "success": false,
-                "error": "Database error"
-            })),
-        )
-            .into_response()),
+        Ok(None) => Err(StatusCode::NOT_FOUND),
+        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
