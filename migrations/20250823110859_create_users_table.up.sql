@@ -14,7 +14,7 @@ CREATE TABLE users (
     email VARCHAR(255) UNIQUE NOT NULL,
     status user_status NOT NULL DEFAULT 'unverified',
     wechat_id VARCHAR(100),
-    card_photo_path VARCHAR(255),
+    card_photo_filename VARCHAR(255),
     grade VARCHAR(50),
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

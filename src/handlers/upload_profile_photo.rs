@@ -148,7 +148,6 @@ pub async fn upload_profile_photo(
         error!(error = %e, "Failed to create upload directory");
         return (StatusCode::INTERNAL_SERVER_ERROR, "File system error").into_response();
     }
-
     let filename = FileManager::generate_user_filename(user.user_id, file_extension);
     let full_path = profile_photos_dir.join(&filename);
 
@@ -162,7 +161,6 @@ pub async fn upload_profile_photo(
 
     info!(
         file_size = file_data.len(),
-        file_path = %full_path.display(),
         "Profile photo uploaded successfully"
     );
 

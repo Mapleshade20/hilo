@@ -40,14 +40,14 @@ async fn test_upload_card_success(pool: PgPool) {
 
     // Verify database was updated (both file path, grade, and status)
     let user_record = sqlx::query!(
-        r#"SELECT card_photo_path, grade, status as "status: UserStatus" FROM users WHERE email = $1"#,
+        r#"SELECT card_photo_filename, grade, status as "status: UserStatus" FROM users WHERE email = $1"#,
         test_email
     )
     .fetch_one(&pool)
     .await
     .expect("Failed to fetch user");
 
-    assert!(user_record.card_photo_path.is_some());
+    assert!(user_record.card_photo_filename.is_some());
     assert_eq!(user_record.grade, Some("undergraduate".to_string()));
     assert_eq!(user_record.status, UserStatus::VerificationPending);
 }

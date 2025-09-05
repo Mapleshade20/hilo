@@ -64,7 +64,7 @@ pub async fn upload_card(
 ) -> impl IntoResponse {
     debug!("Processing card upload request");
 
-    // 1. Check user status - only unverified users can upload
+    // Check user status - only unverified users can upload
     let user_status = match UserStatus::query(&state.db_pool, &user.user_id).await {
         Ok(status) => status,
         Err(resp) => {
@@ -82,7 +82,7 @@ pub async fn upload_card(
             .into_response();
     }
 
-    // 2. Extract fields from multipart form
+    // Extract fields from multipart form
     let mut file_data = None;
     let mut grade = None;
 
@@ -136,7 +136,7 @@ pub async fn upload_card(
         }
     }
 
-    // 3. Validate required fields
+    // Validate required fields
     let file_data = match file_data {
         Some(data) => data,
         None => {
@@ -153,13 +153,13 @@ pub async fn upload_card(
         }
     };
 
-    // 4. Validate file is not empty
+    // Validate file is not empty
     if let Err(e) = ImageUploadValidator::validate_file_not_empty(&file_data) {
         warn!(error = %e, "Empty file uploaded");
         return (StatusCode::BAD_REQUEST, e).into_response();
     }
 
-    // 5. Validate image format using image crate
+    // Validate image format using image crate
     let (file_extension, image_format) =
         match ImageUploadValidator::validate_image_format(&file_data) {
             Ok((ext, format)) => (ext, format),
@@ -171,10 +171,8 @@ pub async fn upload_card(
 
     trace!(format = ?image_format, size = file_data.len(), "Image validation passed");
 
-    // 6. Prepare file storage
+    // Prepare file storage
     let card_photos_dir = Path::new(UPLOAD_DIR.as_str()).join("card_photos");
-
-    // Create directory if it doesn't exist
     if let Err(e) = FileManager::ensure_directory_exists(&card_photos_dir).await {
         error!(error = %e, "Failed to create upload directory");
         return (StatusCode::INTERNAL_SERVER_ERROR, "File system error").into_response();
@@ -184,16 +182,16 @@ pub async fn upload_card(
 
     debug!(file_path = %full_path.display(), grade = %grade, "Saving file");
 
-    // 7. Write file to disk
+    // Write file to disk
     if let Err(e) = FileManager::save_file(&full_path, &file_data).await {
         error!(error = %e, "Failed to save file");
         return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to save file").into_response();
     }
 
-    // 8. Update database with file path, grade, and status
+    // Update database with file path, grade, and status
     match sqlx::query!(
-        "UPDATE users SET card_photo_path = $1, grade = $2, status = $3 WHERE id = $4",
-        full_path.to_str(),
+        "UPDATE users SET card_photo_filename = $1, grade = $2, status = $3 WHERE id = $4",
+        filename,
         grade,
         UserStatus::VerificationPending as UserStatus,
         user.user_id
@@ -203,7 +201,6 @@ pub async fn upload_card(
     {
         Ok(_) => {
             info!(
-                file_name = %filename,
                 file_size = file_data.len(),
                 grade = %grade,
                 "Card uploaded successfully, status updated to verification_pending"

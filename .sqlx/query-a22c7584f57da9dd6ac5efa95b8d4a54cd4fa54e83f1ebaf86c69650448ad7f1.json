@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE users SET card_photo_path = $1, grade = $2, status = $3 WHERE id = $4",
+  "query": "UPDATE users SET card_photo_filename = $1, grade = $2, status = $3 WHERE id = $4",
   "describe": {
     "columns": [],
     "parameters": {
@@ -27,5 +27,5 @@
     },
     "nullable": []
   },
-  "hash": "a09ff4eb2d74ee0436708ab6df7ca047bd1ddd28c567ece7c7f612825f0301df"
+  "hash": "a22c7584f57da9dd6ac5efa95b8d4a54cd4fa54e83f1ebaf86c69650448ad7f1"
 }
