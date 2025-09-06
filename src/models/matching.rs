@@ -51,4 +51,6 @@ pub struct FinalPartnerProfile {
     pub self_intro: String,
     /// Format: /api/images/partner/someuuid.ext
     pub photo_url: Option<String>,
+    /// WeChat ID is included only if both users have accepted the match
+    pub wechat_id: Option<String>,
 }

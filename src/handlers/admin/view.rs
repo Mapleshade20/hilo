@@ -137,7 +137,7 @@ pub async fn get_users_overview(
 
 /// Serves student card photos for admin review.
 ///
-/// GET /api/admin/users/{filename}
+/// GET /api/admin/card/{filename}
 ///
 /// This endpoint serves student verification card photos stored in the filesystem.
 /// Used by admins to review submitted cards during the user verification process.

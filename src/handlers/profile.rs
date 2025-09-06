@@ -33,8 +33,8 @@ pub struct ProfileResponse {
 ///
 /// This endpoint returns the user's email and current status from the database.
 /// For users with status 'matched' or 'confirmed', it also returns their partner's
-/// profile information. It requires authentication via JWT token and uses the user ID
-/// from the token to fetch the most up-to-date profile information.
+/// profile information. The partner's WeChat ID is included only if both users have
+/// confirmed the match.
 ///
 /// # Returns
 ///
@@ -66,9 +66,10 @@ pub async fn get_profile(
         error!("User not found in database");
         AppError::NotFound("User not found")
     })?;
+
     // Check if user is matched or confirmed to fetch partner info
     let final_match = if matches!(row_self.status, UserStatus::Matched | UserStatus::Confirmed) {
-        fetch_partner_profile(&state, &user.user_id)
+        fetch_partner_profile(&state, &user.user_id, row_self.status)
             .await
             .inspect_err(
                 // rarely happens, only if a revoke happens between requests
@@ -94,7 +95,8 @@ pub async fn get_profile(
 /// Fetch partner profile information for matched/confirmed users
 async fn fetch_partner_profile(
     state: &AppState,
-    user_id: &uuid::Uuid,
+    self_id: &uuid::Uuid,
+    self_status: UserStatus,
 ) -> AppResult<FinalPartnerProfile> {
     // Find the final match record to get partner ID
     let final_match = sqlx::query!(
@@ -103,14 +105,14 @@ async fn fetch_partner_profile(
         FROM final_matches
         WHERE user_a_id = $1 OR user_b_id = $1
         "#,
-        user_id
+        self_id
     )
     .fetch_optional(&state.db_pool)
     .await?
     .ok_or_else(|| AppError::NotFound("User not found"))?;
 
     // Determine partner ID
-    let partner_id = if final_match.user_a_id == *user_id {
+    let partner_id = if final_match.user_a_id == *self_id {
         final_match.user_b_id
     } else {
         final_match.user_a_id
@@ -122,6 +124,8 @@ async fn fetch_partner_profile(
         SELECT
             u.email,
             u.grade,
+            u.status as "status: UserStatus",
+            u.wechat_id,
             f.familiar_tags,
             f.aspirational_tags,
             f.self_intro,
@@ -149,6 +153,13 @@ async fn fetch_partner_profile(
         .profile_photo_filename
         .map(|name| format!("/api/images/partner/{name}"));
 
+    let wechat_id =
+        if self_status == UserStatus::Confirmed && partner_info.status == UserStatus::Confirmed {
+            partner_info.wechat_id
+        } else {
+            None
+        };
+
     Ok(FinalPartnerProfile {
         email_domain,
         grade: partner_info.grade,
@@ -156,5 +167,6 @@ async fn fetch_partner_profile(
         aspirational_tags: partner_info.aspirational_tags,
         self_intro: partner_info.self_intro,
         photo_url,
+        wechat_id,
     })
 }

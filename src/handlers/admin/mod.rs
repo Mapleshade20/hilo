@@ -65,7 +65,7 @@ pub fn admin_router(db_pool: PgPool) -> Router {
         .route("/api/admin/update-previews", post(update_match_previews))
         .route("/api/admin/verify-user", post(verify_user))
         .route("/api/admin/users", get(get_users_overview))
-        .route("/api/admin/users/{filename}", get(serve_user_card_photo))
+        .route("/api/admin/card/{filename}", get(serve_user_card_photo))
         .route("/api/admin/user/{user_id}", get(get_user_detail))
         .route("/api/admin/tags", get(get_tags_with_stats))
         .route("/api/admin/matches", get(get_final_matches))
