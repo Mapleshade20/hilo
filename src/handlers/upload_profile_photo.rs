@@ -25,10 +25,11 @@ use axum::{
 use serde::Serialize;
 use tracing::{debug, error, info, instrument, trace, warn};
 
+use crate::error::{AppError, AppResult};
 use crate::middleware::AuthUser;
 use crate::models::{AppState, UserStatus};
+use crate::utils::file::{FileManager, ImageUploadValidator};
 use crate::utils::static_object::UPLOAD_DIR;
-use crate::utils::upload::{FileManager, ImageUploadValidator};
 
 /// Response structure for successful profile photo upload.
 #[derive(Serialize)]
@@ -74,90 +75,81 @@ pub async fn upload_profile_photo(
     State(state): State<Arc<AppState>>,
     Extension(user): Extension<AuthUser>,
     mut multipart: Multipart,
-) -> impl IntoResponse {
+) -> AppResult<impl IntoResponse> {
     debug!("Processing profile photo upload request");
 
     // Check user status - only verified and form_completed users can upload
-    let user_status = match UserStatus::query(&state.db_pool, &user.user_id).await {
-        Ok(status) => status,
-        Err(resp) => {
-            error!("Failed to query user status from database");
-            return resp.into_response();
-        }
-    };
+    let user_status = UserStatus::query(&state.db_pool, &user.user_id).await?;
 
     if !user_status.can_fill_form() {
         warn!(current_status = %user_status, "User status doesn't allow profile photo upload");
-        return (
-            StatusCode::FORBIDDEN,
+        return Err(AppError::Forbidden(
             "User status doesn't allow profile photo upload",
-        )
-            .into_response();
+        ));
     }
 
     // Extract file from multipart form
-    let field = match multipart.next_field().await {
-        Ok(Some(field)) => field,
-        Ok(None) => {
-            warn!("No file provided in multipart form");
-            return (StatusCode::BAD_REQUEST, "No file provided").into_response();
-        }
-        Err(e) => {
+    let field = multipart
+        .next_field()
+        .await
+        .map_err(|e| {
             error!(error = %e, "Error reading multipart form");
-            return (StatusCode::BAD_REQUEST, "Invalid multipart data").into_response();
-        }
-    };
+            AppError::BadRequest("Invalid multipart data")
+        })?
+        .ok_or_else(|| {
+            warn!("No file provided in multipart form");
+            AppError::BadRequest("No file provided")
+        })?;
 
     // Validate content type
     let content_type = field.content_type().unwrap_or("");
-    if let Err(e) = ImageUploadValidator::validate_content_type(content_type) {
+    ImageUploadValidator::validate_content_type(content_type).map_err(|e| {
         warn!(content_type = %content_type, error = %e, "Invalid content type");
-        return (StatusCode::BAD_REQUEST, e).into_response();
-    }
+        AppError::BadRequest(e)
+    })?;
 
     // Read file data
-    let file_data = match field.bytes().await {
-        Ok(data) => data,
-        Err(e) => {
-            error!(error = %e, "Error reading file data");
-            return (StatusCode::BAD_REQUEST, "Error reading file").into_response();
-        }
-    };
+    let file_data = field.bytes().await.map_err(|e| {
+        error!(error = %e, "Error reading file data");
+        AppError::BadRequest("Error reading file")
+    })?;
 
     // Validate file is not empty
-    if let Err(e) = ImageUploadValidator::validate_file_not_empty(&file_data) {
+    ImageUploadValidator::validate_file_not_empty(&file_data).map_err(|e| {
         warn!(error = %e, "Empty file uploaded");
-        return (StatusCode::BAD_REQUEST, e).into_response();
-    }
+        AppError::BadRequest(e)
+    })?;
 
     // Validate format using image crate
-    let (file_extension, image_format) =
-        match ImageUploadValidator::validate_image_format(&file_data) {
-            Ok((ext, format)) => (ext, format),
-            Err(e) => {
-                warn!(error = %e, "Invalid image format");
-                return (StatusCode::BAD_REQUEST, e).into_response();
-            }
-        };
+    let (file_extension, image_format) = ImageUploadValidator::validate_image_format(&file_data)
+        .map_err(|e| {
+            warn!(error = %e, "Invalid image format");
+            AppError::BadRequest(e)
+        })?;
 
     trace!(format = ?image_format, size = file_data.len(), "Image validation passed");
 
     // Prepare file storage
     let profile_photos_dir = Path::new(UPLOAD_DIR.as_str()).join("profile_photos");
-    if let Err(e) = FileManager::ensure_directory_exists(&profile_photos_dir).await {
-        error!(error = %e, "Failed to create upload directory");
-        return (StatusCode::INTERNAL_SERVER_ERROR, "File system error").into_response();
-    }
+    FileManager::ensure_directory_exists(&profile_photos_dir)
+        .await
+        .map_err(|e| {
+            error!(error = %e, "Failed to create upload directory");
+            AppError::Internal
+        })?;
+
     let filename = FileManager::generate_user_filename(user.user_id, file_extension);
     let full_path = profile_photos_dir.join(&filename);
 
     debug!(file_path = %full_path.display(), "Saving profile photo");
 
     // Write file to disk
-    if let Err(e) = FileManager::save_file(&full_path, &file_data).await {
-        error!(error = %e, "Failed to save file");
-        return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to save file").into_response();
-    }
+    FileManager::save_file(&full_path, &file_data)
+        .await
+        .map_err(|e| {
+            error!(error = %e, "Failed to save file");
+            AppError::Internal
+        })?;
 
     info!(
         file_size = file_data.len(),
@@ -166,9 +158,9 @@ pub async fn upload_profile_photo(
 
     // Return success response with filename (without database update, which should be handled
     // when user submits their form)
-    (
+    Ok((
         StatusCode::OK,
         Json(UploadProfilePhotoResponse { filename }),
     )
-        .into_response()
+        .into_response())
 }

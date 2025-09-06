@@ -11,6 +11,7 @@ use super::{
     AdminState, build_veto_map, calculate_tag_frequencies, create_final_match, fetch_all_vetoes,
     get_user_id_by_email, get_user_status, is_vetoed, update_user_status,
 };
+use crate::error::{AppError, AppResult};
 use crate::models::{FinalMatch, TagSystem, UserStatus};
 use crate::services::matching::MatchingService;
 
@@ -22,36 +23,32 @@ pub struct ActionResponse {
 
 /// Admin endpoint to trigger the final matching algorithm
 #[instrument(skip_all, fields(request_id = %uuid::Uuid::new_v4()))]
-pub async fn trigger_final_matching(State(state): State<Arc<AdminState>>) -> impl IntoResponse {
-    match execute_final_matching(&state.db_pool, state.tag_system).await {
-        Ok(matches) => {
-            info!("Final matching completed: {} pairs", matches.len());
-            (
-                StatusCode::OK,
-                Json(ActionResponse {
-                    success: true,
-                    message: "Final matching completed successfully",
-                }),
-            )
-        }
-        Err(e) => {
+pub async fn trigger_final_matching(
+    State(state): State<Arc<AdminState>>,
+) -> AppResult<impl IntoResponse> {
+    let matches = execute_final_matching(&state.db_pool, state.tag_system)
+        .await
+        .map_err(|e| {
             error!("Final matching failed: {}", e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ActionResponse {
-                    success: false,
-                    message: "Final matching failed",
-                }),
-            )
-        }
-    }
+            AppError::Internal
+        })?;
+
+    info!("Final matching completed: {} pairs", matches.len());
+    Ok((
+        StatusCode::OK,
+        Json(ActionResponse {
+            success: true,
+            message: "Final matching completed successfully",
+        }),
+    )
+        .into_response())
 }
 
 /// Execute the final matching algorithm using greedy approach
 async fn execute_final_matching(
     db_pool: &PgPool,
     tag_system: &TagSystem,
-) -> Result<Vec<FinalMatch>, Box<dyn std::error::Error + Send + Sync>> {
+) -> AppResult<Vec<FinalMatch>> {
     // Fetch all users with submitted forms
     let forms = MatchingService::fetch_unmatched_forms(db_pool).await?;
     if forms.is_empty() {
@@ -143,29 +140,25 @@ async fn execute_final_matching(
 
 /// Admin endpoint to manually update match previews
 #[instrument(skip_all, fields(request_id = %uuid::Uuid::new_v4()))]
-pub async fn update_match_previews(State(state): State<Arc<AdminState>>) -> impl IntoResponse {
-    match MatchingService::generate_match_previews(&state.db_pool, state.tag_system).await {
-        Ok(_) => {
-            info!("Match previews update completed successfully");
-            (
-                StatusCode::OK,
-                Json(ActionResponse {
-                    success: true,
-                    message: "Match previews updated successfully",
-                }),
-            )
-        }
-        Err(e) => {
+pub async fn update_match_previews(
+    State(state): State<Arc<AdminState>>,
+) -> AppResult<impl IntoResponse> {
+    MatchingService::generate_match_previews(&state.db_pool, state.tag_system)
+        .await
+        .map_err(|e| {
             error!("Match previews update failed: {}", e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ActionResponse {
-                    success: false,
-                    message: "Match previews update failed",
-                }),
-            )
-        }
-    }
+            AppError::Internal
+        })?;
+
+    info!("Match previews update completed successfully");
+    Ok((
+        StatusCode::OK,
+        Json(ActionResponse {
+            success: true,
+            message: "Match previews updated successfully",
+        }),
+    )
+        .into_response())
 }
 
 /// Request payload for admin user verification
@@ -192,111 +185,56 @@ pub struct VerifyUserResponse {
 pub async fn verify_user(
     State(state): State<Arc<AdminState>>,
     Json(payload): Json<VerifyUserRequest>,
-) -> impl IntoResponse {
+) -> AppResult<impl IntoResponse> {
     // Validate target status
     if !matches!(
         payload.status,
         UserStatus::Verified | UserStatus::Unverified
     ) {
         warn!("Invalid target status: {:?}", payload.status);
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(VerifyUserResponse {
-                success: false,
-                message: "Invalid target status",
-                user_id: Uuid::nil(),
-            }),
-        );
+        return Err(AppError::BadRequest("Invalid target status"));
     }
 
     // Get user ID (prioritize user_id over email)
     let user_id = if let Some(id) = payload.user_id {
         id
     } else if let Some(email) = &payload.email {
-        match get_user_id_by_email(&state.db_pool, email).await {
-            Ok(id) => id,
-            Err(code) => {
-                warn!("User not found by email: {}", email);
-                return (
-                    code,
-                    Json(VerifyUserResponse {
-                        success: false,
-                        message: "User not found by email",
-                        user_id: Uuid::nil(),
-                    }),
-                );
-            }
-        }
+        get_user_id_by_email(&state.db_pool, email).await?
     } else {
         warn!("Neither user_id nor email provided");
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(VerifyUserResponse {
-                success: false,
-                message: "Must provide either user_id or email",
-                user_id: Uuid::nil(),
-            }),
-        );
+        return Err(AppError::BadRequest("Must provide either user_id or email"));
     };
 
     // Check current user status: should not be 'unverified'
-    let current_status = match get_user_status(&state.db_pool, &user_id).await {
-        Ok(status) => status,
-        Err(code) => {
-            error!(%user_id, "Failed to get user status for user_id");
-            return (
-                code,
-                Json(VerifyUserResponse {
-                    success: false,
-                    message: "Failed to get user status",
-                    user_id,
-                }),
-            );
-        }
-    };
+    let current_status = get_user_status(&state.db_pool, &user_id).await?;
+
     if current_status == UserStatus::Unverified {
         warn!(
             %user_id,
             "User status is {:?}, expected verification_pending",
             current_status
         );
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(VerifyUserResponse {
-                success: false,
-                message: "Cannot change status of an unverified user",
-                user_id,
-            }),
-        );
+        return Err(AppError::BadRequest(
+            "Cannot change status of an unverified user",
+        ));
     }
 
     // Update user status
-    match update_user_status(&state.db_pool, &user_id, payload.status).await {
-        Ok(_) => {
-            info!(
-                %user_id,
-                "Successfully updated user status from {:?} to {:?}",
-                current_status, payload.status
-            );
-            (
-                StatusCode::OK,
-                Json(VerifyUserResponse {
-                    success: true,
-                    message: "User status updated successfully",
-                    user_id,
-                }),
-            )
-        }
-        Err(e) => {
-            error!("Failed to update user status: {}", e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(VerifyUserResponse {
-                    success: false,
-                    message: "Failed to update user status",
-                    user_id,
-                }),
-            )
-        }
-    }
+    update_user_status(&state.db_pool, &user_id, payload.status).await?;
+
+    info!(
+        %user_id,
+        "Successfully updated user status from {:?} to {:?}",
+        current_status, payload.status
+    );
+
+    Ok((
+        StatusCode::OK,
+        Json(VerifyUserResponse {
+            success: true,
+            message: "User status updated successfully",
+            user_id,
+        }),
+    )
+        .into_response())
 }

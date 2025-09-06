@@ -9,13 +9,14 @@ use std::sync::Arc;
 use axum::{
     body::Body,
     extract::{Extension, State},
-    http::{Request, StatusCode},
+    http::Request,
     response::IntoResponse,
 };
 use tower_http::services::ServeFile;
 use tracing::{debug, error, instrument, trace, warn};
 use uuid::Uuid;
 
+use crate::error::{AppError, AppResult};
 use crate::models::AppState;
 use crate::utils::static_object::UPLOAD_DIR;
 
@@ -31,11 +32,11 @@ pub async fn serve_partner_image(
     State(state): State<Arc<AppState>>,
     Extension(requested_id): Extension<Uuid>,
     req: Request<Body>,
-) -> impl IntoResponse {
+) -> AppResult<impl IntoResponse> {
     trace!("Serving partner image");
 
     // Query the partner's profile photo filename
-    let photo_result = sqlx::query!(
+    let photo_filename = sqlx::query!(
         r#"
         SELECT profile_photo_filename
         FROM forms
@@ -44,25 +45,16 @@ pub async fn serve_partner_image(
         requested_id
     )
     .fetch_optional(&state.db_pool)
-    .await;
-
-    let photo_filename = match photo_result {
-        Ok(Some(record)) => match record.profile_photo_filename {
-            Some(filename) => filename,
-            None => {
-                debug!(?requested_id, "No profile photo found");
-                return (StatusCode::NOT_FOUND, "No profile photo found").into_response();
-            }
-        },
-        Ok(None) => {
-            warn!(?requested_id, "User not found in forms table");
-            return (StatusCode::NOT_FOUND, "User not found").into_response();
-        }
-        Err(e) => {
-            error!("Database error when fetching profile photo: {}", e);
-            return (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response();
-        }
-    };
+    .await?
+    .ok_or_else(|| {
+        warn!(?requested_id, "User not found in forms table");
+        AppError::NotFound("User not found")
+    })?
+    .profile_photo_filename
+    .ok_or_else(|| {
+        debug!(?requested_id, "No profile photo found");
+        AppError::NotFound("No profile photo found")
+    })?;
 
     // Construct the file path
     let file_path = Path::new(UPLOAD_DIR.as_str())
@@ -73,11 +65,12 @@ pub async fn serve_partner_image(
 
     // Use tower-http's ServeFile to serve the image
     let mut service = ServeFile::new(file_path);
-    match service.try_call(req).await {
-        Ok(res) => res.into_response(),
-        Err(e) => {
+    service
+        .try_call(req)
+        .await
+        .map(|res| res.into_response())
+        .map_err(|e| {
             error!("Failed to serve file: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to serve file").into_response()
-        }
-    }
+            AppError::Internal
+        })
 }

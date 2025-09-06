@@ -4,7 +4,7 @@ use std::sync::LazyLock;
 use regex::Regex;
 use tracing::error;
 
-use crate::models::TagSystem;
+use crate::models::{TagNode, TagSystem};
 
 /// Email validation regex pattern
 ///
@@ -47,7 +47,20 @@ pub static TAG_SYSTEM: LazyLock<TagSystem> = LazyLock::new(|| {
         error!("Failed to read tags.json file");
         std::process::exit(1);
     });
+
     TagSystem::from_json(&raw).unwrap_or_else(|e| {
+        error!("Failed to parse tags.json: {}", e);
+        std::process::exit(1)
+    })
+});
+
+pub static TAG_TREE: LazyLock<Vec<TagNode>> = LazyLock::new(|| {
+    let raw = std::fs::read_to_string("tags.json").unwrap_or_else(|_| {
+        error!("Failed to read tags.json file");
+        std::process::exit(1);
+    });
+
+    serde_json::from_str(&raw).unwrap_or_else(|e| {
         error!("Failed to parse tags.json: {}", e);
         std::process::exit(1)
     })

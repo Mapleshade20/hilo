@@ -24,6 +24,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, instrument, warn};
 use validator::Validate;
 
+use crate::error::{AppError, AppResult};
 use crate::models::AppState;
 use crate::utils::{constant::*, static_object::EMAIL_REGEX};
 
@@ -82,13 +83,13 @@ pub struct RefreshTokenRequest {
 pub async fn send_verification_code(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<SendCodeRequest>,
-) -> impl IntoResponse {
+) -> AppResult<impl IntoResponse> {
     debug!("Processing verification code request");
 
     // 1. Validate format
     if payload.validate().is_err() {
         warn!("Invalid email format provided");
-        return (StatusCode::BAD_REQUEST, "Invalid input").into_response();
+        return Err(AppError::BadRequest("Invalid input"));
     }
 
     // 2. Check rate limit
@@ -96,12 +97,11 @@ pub async fn send_verification_code(
         && entry.elapsed() < EMAIL_RATE_LIMIT
     {
         let remaining = EMAIL_RATE_LIMIT - entry.elapsed();
-        let message = "Rate limit exceeded";
         warn!(
             remaining_seconds = remaining.as_secs(),
             "Rate limit exceeded for email"
         );
-        return (StatusCode::TOO_MANY_REQUESTS, message).into_response();
+        return Err(AppError::TooManyRequests);
     }
 
     // 3. Generate verification code
@@ -118,20 +118,17 @@ pub async fn send_verification_code(
     debug!("Cached verification code and rate limit");
 
     // 5. Send email
-    match state
+    state
         .email_service
         .send_email(&payload.email, "Verification code", &code)
         .await
-    {
-        Err(e) => {
+        .map_err(|e| {
             error!(error = %e, "Failed to send verification code");
-            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to send email").into_response()
-        }
-        Ok(_) => {
-            info!("Successfully sent verification code");
-            (StatusCode::OK, "Verification code sent").into_response()
-        }
-    }
+            AppError::Internal
+        })?;
+
+    info!("Successfully sent verification code");
+    Ok((StatusCode::OK, "Verification code sent").into_response())
 }
 
 /// Verifies the email verification code and creates user account.
@@ -163,13 +160,13 @@ pub async fn send_verification_code(
 pub async fn verify_code(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<VerifyRequest>,
-) -> impl IntoResponse {
+) -> AppResult<impl IntoResponse> {
     debug!("Processing code verification request");
 
     // 1. Validate format
     if payload.validate().is_err() {
         warn!("Invalid verification request format");
-        return (StatusCode::BAD_REQUEST, "Invalid input").into_response();
+        return Err(AppError::BadRequest("Invalid input"));
     }
 
     // 2. Check verification code (do not leak references into the map)
@@ -191,12 +188,12 @@ pub async fn verify_code(
 
     if !is_valid {
         warn!("Invalid or expired verification code provided");
-        return (StatusCode::BAD_REQUEST, "Invalid or expired code").into_response();
+        return Err(AppError::BadRequest("Invalid or expired code"));
     }
 
     // 3. Insert user in DB
     debug!("Creating/updating user in database");
-    let Ok(user_id) = sqlx::query_scalar!(
+    let user_id = sqlx::query_scalar!(
         r#"
         INSERT INTO users (email, status) VALUES ($1, 'unverified')
         ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
@@ -205,26 +202,22 @@ pub async fn verify_code(
         payload.email
     )
     .fetch_one(&state.db_pool)
-    .await
-    else {
-        error!("Database error when inserting/updating user");
-        return (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response();
-    };
+    .await?;
 
     info!(user_id = %user_id, "User created/updated successfully");
 
     // 4. Generate JWT token pair
     debug!("Generating JWT token pair");
-    let token_pair = match state.jwt_service.create_token_pair(user_id).await {
-        Ok(pair) => {
-            info!("JWT token pair created successfully");
-            pair
-        }
-        Err(e) => {
+    let token_pair = state
+        .jwt_service
+        .create_token_pair(user_id)
+        .await
+        .map_err(|e| {
             error!(error = %e, "Failed to create token pair");
-            return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to create tokens").into_response();
-        }
-    };
+            AppError::Internal
+        })?;
+
+    info!("JWT token pair created successfully");
 
     // 5. Remove verification code from cache
     state.verification_code_cache.remove(&payload.email);
@@ -233,7 +226,7 @@ pub async fn verify_code(
     // do this in background task
 
     info!("Code verification completed successfully");
-    (
+    Ok((
         StatusCode::OK,
         Json(AuthResponse {
             access_token: token_pair.access_token,
@@ -242,7 +235,7 @@ pub async fn verify_code(
             expires_in: token_pair.expires_in,
         }),
     )
-        .into_response()
+        .into_response())
 }
 
 /// Refreshes JWT token pair using a valid refresh token.
@@ -267,30 +260,27 @@ pub async fn verify_code(
 pub async fn refresh_token(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<RefreshTokenRequest>,
-) -> impl IntoResponse {
+) -> AppResult<impl IntoResponse> {
     debug!("Processing token refresh request");
 
-    match state
+    let token_pair = state
         .jwt_service
         .refresh_token_pair(&payload.refresh_token)
         .await
-    {
-        Ok(token_pair) => {
-            info!("Token refresh successful");
-            (
-                StatusCode::OK,
-                Json(AuthResponse {
-                    access_token: token_pair.access_token,
-                    refresh_token: token_pair.refresh_token,
-                    token_type: "Bearer".into(),
-                    expires_in: token_pair.expires_in,
-                }),
-            )
-                .into_response()
-        }
-        Err(e) => {
+        .map_err(|e| {
             warn!(error = %e, "Token refresh failed");
-            (StatusCode::UNAUTHORIZED, "Invalid refresh token").into_response()
-        }
-    }
+            AppError::Unauthorized("Invalid refresh token")
+        })?;
+
+    info!("Token refresh successful");
+    Ok((
+        StatusCode::OK,
+        Json(AuthResponse {
+            access_token: token_pair.access_token,
+            refresh_token: token_pair.refresh_token,
+            token_type: "Bearer".into(),
+            expires_in: token_pair.expires_in,
+        }),
+    )
+        .into_response())
 }

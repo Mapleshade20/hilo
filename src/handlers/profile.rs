@@ -14,6 +14,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, instrument};
 
+use crate::error::{AppError, AppResult};
 use crate::middleware::AuthUser;
 use crate::models::{AppState, FinalPartnerProfile, UserStatus};
 
@@ -37,7 +38,7 @@ pub struct ProfileResponse {
 ///
 /// # Returns
 ///
-/// - `200 OK` with ProfileResponse - Profile information retrieved successfully
+/// - `200 OK` with `ProfileResponse` - Profile information retrieved successfully
 /// - `401 Unauthorized` - Missing or invalid authentication token
 /// - `404 Not Found` - User not found in database
 /// - `500 Internal Server Error` - Database error
@@ -51,61 +52,50 @@ pub struct ProfileResponse {
 pub async fn get_profile(
     State(state): State<Arc<AppState>>,
     Extension(user): Extension<AuthUser>,
-) -> impl IntoResponse {
+) -> AppResult<impl IntoResponse> {
     debug!("Processing profile request");
 
     // Query user profile from database
-    let result = sqlx::query!(
+    let row_self = sqlx::query!(
         r#"SELECT email, status as "status: UserStatus", grade FROM users WHERE id = $1"#,
         user.user_id
     )
     .fetch_optional(&state.db_pool)
-    .await;
-
-    match result {
-        Ok(Some(row_self)) => {
-            // Check if user is matched or confirmed to fetch partner info
-            let final_match =
-                if matches!(row_self.status, UserStatus::Matched | UserStatus::Confirmed) {
-                    fetch_partner_profile(&state, &user.user_id)
-                        .await
-                        .inspect_err(
-                            // rarely happens, only if a revoke happens between requests
-                            |e| error!("Failed to fetch partner profile: {}", e),
-                        )
-                        .ok()
-                } else {
-                    None
-                };
-
-            info!("Profile retrieved successfully");
-            (
-                StatusCode::OK,
-                Json(ProfileResponse {
-                    email: row_self.email,
-                    status: row_self.status,
-                    grade: row_self.grade,
-                    final_match,
-                }),
+    .await?
+    .ok_or_else(|| {
+        error!("User not found in database");
+        AppError::NotFound("User not found")
+    })?;
+    // Check if user is matched or confirmed to fetch partner info
+    let final_match = if matches!(row_self.status, UserStatus::Matched | UserStatus::Confirmed) {
+        fetch_partner_profile(&state, &user.user_id)
+            .await
+            .inspect_err(
+                // rarely happens, only if a revoke happens between requests
+                |e| error!("Failed to fetch partner profile: {}", e),
             )
-                .into_response()
-        }
-        Ok(None) => {
-            error!("User not found in database");
-            (StatusCode::NOT_FOUND, "User not found").into_response()
-        }
-        Err(e) => {
-            error!(error = %e, "Database error when fetching profile");
-            (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response()
-        }
-    }
+            .ok()
+    } else {
+        None
+    };
+
+    info!("Profile retrieved successfully");
+    Ok((
+        StatusCode::OK,
+        Json(ProfileResponse {
+            email: row_self.email,
+            status: row_self.status,
+            grade: row_self.grade,
+            final_match,
+        }),
+    ))
 }
 
 /// Fetch partner profile information for matched/confirmed users
 async fn fetch_partner_profile(
     state: &AppState,
     user_id: &uuid::Uuid,
-) -> Result<FinalPartnerProfile, Box<dyn std::error::Error + Send + Sync>> {
+) -> AppResult<FinalPartnerProfile> {
     // Find the final match record to get partner ID
     let final_match = sqlx::query!(
         r#"
@@ -117,7 +107,7 @@ async fn fetch_partner_profile(
     )
     .fetch_optional(&state.db_pool)
     .await?
-    .ok_or("No final match found for user")?;
+    .ok_or_else(|| AppError::NotFound("User not found"))?;
 
     // Determine partner ID
     let partner_id = if final_match.user_a_id == *user_id {
@@ -144,7 +134,7 @@ async fn fetch_partner_profile(
     )
     .fetch_optional(&state.db_pool)
     .await?
-    .ok_or("Partner not found")?;
+    .ok_or_else(|| AppError::NotFound("Partner not found"))?;
 
     // Extract email domain
     let email_domain = partner_info

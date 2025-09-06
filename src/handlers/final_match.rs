@@ -10,8 +10,9 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
-use tracing::{error, info, instrument, warn};
+use tracing::{info, instrument, warn};
 
+use crate::error::{AppError, AppResult};
 use crate::middleware::AuthUser;
 use crate::models::{AppState, UserStatus};
 
@@ -31,35 +32,25 @@ use crate::models::{AppState, UserStatus};
 pub async fn accept_final_match(
     State(state): State<Arc<AppState>>,
     Extension(user): Extension<AuthUser>,
-) -> impl IntoResponse {
+) -> AppResult<impl IntoResponse> {
     // Check user status - must be 'matched'
-    let user_status = match UserStatus::query(&state.db_pool, &user.user_id).await {
-        Ok(status) => status,
-        Err(e) => return e.into_response().status(),
-    };
+    let user_status = UserStatus::query(&state.db_pool, &user.user_id).await?;
 
     if user_status != UserStatus::Matched {
         warn!("User status is {:?}, expected 'matched'", user_status);
-        return StatusCode::BAD_REQUEST;
+        return Err(AppError::BadRequest("User is not in matched status"));
     }
 
     // Update user status to 'confirmed'
-    match sqlx::query!(
+    sqlx::query!(
         "UPDATE users SET status = 'confirmed' WHERE id = $1",
         user.user_id
     )
     .execute(&state.db_pool)
-    .await
-    {
-        Ok(_) => {
-            info!("User successfully accepted final match");
-            StatusCode::OK
-        }
-        Err(e) => {
-            error!("Failed to update user status: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        }
-    }
+    .await?;
+
+    info!("User successfully accepted final match");
+    Ok(StatusCode::OK.into_response())
 }
 
 /// Reject a final match result
@@ -78,20 +69,17 @@ pub async fn accept_final_match(
 pub async fn reject_final_match(
     State(state): State<Arc<AppState>>,
     Extension(user): Extension<AuthUser>,
-) -> impl IntoResponse {
+) -> AppResult<impl IntoResponse> {
     // Check user status - must be 'matched'
-    let user_status = match UserStatus::query(&state.db_pool, &user.user_id).await {
-        Ok(status) => status,
-        Err(e) => return e.into_response().status(),
-    };
+    let user_status = UserStatus::query(&state.db_pool, &user.user_id).await?;
 
     if user_status != UserStatus::Matched {
         warn!("User status is {:?}, expected 'matched'", user_status);
-        return StatusCode::BAD_REQUEST;
+        return Err(AppError::BadRequest("User is not in matched status"));
     }
 
     // Find the partner and final match record
-    let final_match_result = sqlx::query!(
+    let final_match = sqlx::query!(
         r#"
         SELECT id, user_a_id, user_b_id
         FROM final_matches
@@ -100,19 +88,11 @@ pub async fn reject_final_match(
         user.user_id
     )
     .fetch_optional(&state.db_pool)
-    .await;
-
-    let final_match = match final_match_result {
-        Ok(Some(record)) => record,
-        Ok(None) => {
-            warn!("No final match found for user");
-            return StatusCode::BAD_REQUEST;
-        }
-        Err(e) => {
-            error!("Database error when finding final match: {}", e);
-            return StatusCode::INTERNAL_SERVER_ERROR;
-        }
-    };
+    .await?
+    .ok_or_else(|| {
+        warn!("No final match found for user");
+        AppError::BadRequest("No final match found for user")
+    })?;
 
     // Determine partner ID
     let partner_id = if final_match.user_a_id == user.user_id {
@@ -122,46 +102,29 @@ pub async fn reject_final_match(
     };
 
     // Begin transaction to atomically revert both users to 'form_completed' status and delete match
-    let mut tx = match state.db_pool.begin().await {
-        Ok(tx) => tx,
-        Err(e) => {
-            error!("Failed to begin transaction: {}", e);
-            return StatusCode::INTERNAL_SERVER_ERROR;
-        }
-    };
+    let mut tx = state.db_pool.begin().await?;
 
-    let result: Result<(), sqlx::Error> = async {
-        sqlx::query!(
-            "UPDATE users SET status = 'form_completed' WHERE id = $1",
-            user.user_id
-        )
+    // Update both users' statuses and delete the final match record
+    sqlx::query!(
+        "UPDATE users SET status = 'form_completed' WHERE id = $1",
+        user.user_id
+    )
+    .execute(tx.as_mut())
+    .await?;
+
+    sqlx::query!(
+        "UPDATE users SET status = 'form_completed' WHERE id = $1",
+        partner_id
+    )
+    .execute(tx.as_mut())
+    .await?;
+
+    sqlx::query!("DELETE FROM final_matches WHERE id = $1", final_match.id)
         .execute(tx.as_mut())
         .await?;
 
-        sqlx::query!(
-            "UPDATE users SET status = 'form_completed' WHERE id = $1",
-            partner_id
-        )
-        .execute(tx.as_mut())
-        .await?;
+    tx.commit().await?;
 
-        sqlx::query!("DELETE FROM final_matches WHERE id = $1", final_match.id)
-            .execute(tx.as_mut())
-            .await?;
-
-        tx.commit().await?;
-        Ok(())
-    }
-    .await;
-
-    match result {
-        Ok(()) => {
-            info!(%partner_id, "User successfully rejected final match");
-            StatusCode::OK
-        }
-        Err(e) => {
-            error!("Database error during rejection: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        }
-    }
+    info!(%partner_id, "User successfully rejected final match");
+    Ok(StatusCode::OK.into_response())
 }

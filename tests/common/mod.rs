@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, Once};
 
 use async_trait::async_trait;
 use hilo::handlers::AuthResponse;
@@ -9,6 +9,16 @@ use reqwest::multipart;
 use serde_json::{Value, json};
 use sqlx::PgPool;
 use tokio::net::TcpListener;
+
+pub fn init_tracing_once() {
+    static INIT: Once = Once::new();
+    INIT.call_once(|| {
+        tracing_subscriber::fmt()
+            .with_env_filter("hilo=debug")
+            .with_test_writer()
+            .init();
+    });
+}
 
 /// A mock email service that stores sent emails for testing purposes.
 /// This is ideal for integration tests as it doesn't produce console output.
@@ -77,6 +87,7 @@ impl EmailService for MockEmailer {
 /// Returned address format: `http://127.0.0.1:8492`
 pub async fn spawn_app(test_db_pool: PgPool) -> (String, Arc<MockEmailer>) {
     dotenvy::from_filename_override("tests/data/.test.env").unwrap();
+    init_tracing_once();
 
     let mock_emailer = Arc::new(MockEmailer::new());
     let mock_cloned = Arc::clone(&mock_emailer);
@@ -123,6 +134,7 @@ pub struct TestApp {
 /// Spawns only the admin app for testing admin-specific functionality
 pub async fn spawn_admin_app(test_db_pool: PgPool) -> TestApp {
     dotenvy::from_filename_override("tests/data/.test.env").unwrap();
+    init_tracing_once();
 
     // Randomly choose an available port
     let listener = TcpListener::bind("127.0.0.1:0")

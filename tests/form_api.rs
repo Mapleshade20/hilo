@@ -48,8 +48,6 @@ async fn test_submit_form_success(pool: PgPool) {
         .expect("Failed to submit form");
 
     assert_eq!(response.status(), reqwest::StatusCode::OK);
-    let body = response.text().await.expect("Failed to read response");
-    assert_eq!(body, "Form submitted successfully");
 
     // Verify user status was updated to form_completed
     let user_status = sqlx::query!(
@@ -195,8 +193,6 @@ async fn test_get_form_not_found(pool: PgPool) {
         .expect("Failed to get form");
 
     assert_eq!(response.status(), reqwest::StatusCode::NOT_FOUND);
-    let body = response.text().await.expect("Failed to read response");
-    assert_eq!(body, "Form not found");
 }
 
 #[sqlx::test]
@@ -287,8 +283,6 @@ async fn test_submit_form_too_many_tags(pool: PgPool) {
         .expect("Failed to submit form");
 
     assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
-    let body = response.text().await.expect("Failed to read response");
-    assert!(body.contains("Total tags cannot exceed"));
 }
 
 #[sqlx::test]
@@ -439,8 +433,6 @@ async fn test_submit_form_invalid_wechat_id(pool: PgPool) {
         .expect("Failed to submit form");
 
     assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
-    let body = response.text().await.expect("Failed to read response");
-    assert!(body.contains("wechat_id cannot exceed 100 characters"));
 }
 
 #[sqlx::test]

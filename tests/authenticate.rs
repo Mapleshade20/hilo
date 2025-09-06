@@ -138,7 +138,7 @@ async fn test_verify_code_wrong_code(pool: PgPool) {
     assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
 
     let body = response.text().await.expect("Failed to read response");
-    assert_eq!(body, "Invalid or expired code");
+    assert!(body.contains("Invalid or expired code"));
 }
 
 #[sqlx::test]
@@ -215,7 +215,7 @@ async fn test_refresh_token_rotation(pool: PgPool) {
 
     assert_eq!(response.status(), reqwest::StatusCode::UNAUTHORIZED);
     let body = response.text().await.expect("Failed to read response");
-    assert_eq!(body, "Invalid refresh token");
+    assert!(body.contains("Invalid refresh token"));
 }
 
 #[sqlx::test]
@@ -235,7 +235,7 @@ async fn test_refresh_token_invalid(pool: PgPool) {
     assert_eq!(response.status(), reqwest::StatusCode::UNAUTHORIZED);
 
     let body = response.text().await.expect("Failed to read response");
-    assert_eq!(body, "Invalid refresh token");
+    assert!(body.contains("Invalid refresh token"));
 }
 
 #[sqlx::test]

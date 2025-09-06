@@ -8,7 +8,7 @@ use image::ImageFormat;
 use std::path::Path;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
-use tracing::{debug, error, trace};
+use tracing::{debug, trace};
 
 /// Provides image validation utilities for upload handlers.
 pub struct ImageUploadValidator;
@@ -24,11 +24,9 @@ impl ImageUploadValidator {
     ///
     /// * `Ok(())` - Content type is valid (starts with "image/")
     /// * `Err(String)` - Content type is invalid with error message
-    pub fn validate_content_type(content_type: &str) -> Result<(), String> {
+    pub fn validate_content_type(content_type: &str) -> Result<(), &'static str> {
         if !content_type.starts_with("image/") {
-            return Err(format!(
-                "File must be an image (image/* content type required), got: {content_type}"
-            ));
+            return Err("File must be an image (image/* content type required)");
         }
         Ok(())
     }
@@ -43,9 +41,9 @@ impl ImageUploadValidator {
     ///
     /// * `Ok((extension, format))` - Valid image with file extension and ImageFormat
     /// * `Err(String)` - Invalid image format with error message
-    pub fn validate_image_format(data: &[u8]) -> Result<(&'static str, ImageFormat), String> {
+    pub fn validate_image_format(data: &[u8]) -> Result<(&'static str, ImageFormat), &'static str> {
         let image_format =
-            image::guess_format(data).map_err(|e| format!("Could not detect image format: {e}"))?;
+            image::guess_format(data).map_err(|_| "Could not detect image format")?;
 
         let (file_extension, is_allowed_format) = match image_format {
             ImageFormat::Png => ("png", true),
@@ -55,9 +53,7 @@ impl ImageUploadValidator {
         };
 
         if !is_allowed_format {
-            return Err(format!(
-                "Only PNG, JPG, and WEBP formats are allowed, got: {image_format:?}"
-            ));
+            return Err("Only PNG, JPG, and WEBP formats are allowed");
         }
 
         trace!(format = ?image_format, extension = file_extension, "Image format validated");
@@ -144,25 +140,5 @@ impl FileManager {
 
         debug!(file_path = %file_path.display(), "File saved successfully");
         Ok(())
-    }
-
-    /// Attempts to clean up a file (used for error recovery).
-    ///
-    /// # Arguments
-    ///
-    /// * `file_path` - The path to the file to clean up
-    ///
-    /// This function logs errors but doesn't return them, as it's used for cleanup
-    /// in error scenarios where the original error should be preserved.
-    pub async fn cleanup_file(file_path: &Path) {
-        if let Err(e) = fs::remove_file(file_path).await {
-            error!(
-                file_path = %file_path.display(),
-                error = %e,
-                "Failed to clean up file during error recovery"
-            );
-        } else {
-            debug!(file_path = %file_path.display(), "File cleaned up successfully");
-        }
     }
 }

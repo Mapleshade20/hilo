@@ -6,14 +6,15 @@ use std::sync::Arc;
 
 use axum::{
     Router,
-    http::StatusCode,
     routing::{get, post},
 };
 use serde::Serialize;
 use sqlx::PgPool;
+use tracing::warn;
 use uuid::Uuid;
 
-use crate::models::{FinalMatch, Form, TagSystem, UserStatus, Veto};
+use crate::error::{AppError, AppResult};
+use crate::models::{FinalMatch, Form, TagNode, TagSystem, UserStatus, Veto};
 use crate::utils::static_object::TAG_SYSTEM;
 use action::{trigger_final_matching, update_match_previews, verify_user};
 use view::{
@@ -63,29 +64,33 @@ fn calculate_tag_frequencies(forms: &[Form]) -> HashMap<String, u32> {
 }
 
 /// Get user ID by email
-async fn get_user_id_by_email(db_pool: &PgPool, email: &str) -> Result<Uuid, StatusCode> {
+async fn get_user_id_by_email(db_pool: &PgPool, email: &str) -> AppResult<Uuid> {
     match sqlx::query_scalar!("SELECT id FROM users WHERE email = $1", email)
         .fetch_optional(db_pool)
-        .await
+        .await?
     {
-        Ok(Some(user_id)) => Ok(user_id),
-        Ok(None) => Err(StatusCode::NOT_FOUND),
-        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+        Some(user_id) => Ok(user_id),
+        None => {
+            warn!(%email, "User not found");
+            Err(AppError::NotFound("User not found"))
+        }
     }
 }
 
 /// Get current user status
-async fn get_user_status(db_pool: &PgPool, user_id: &Uuid) -> Result<UserStatus, StatusCode> {
+async fn get_user_status(db_pool: &PgPool, user_id: &Uuid) -> AppResult<UserStatus> {
     match sqlx::query!(
         r#"SELECT status as "status: UserStatus" FROM users WHERE id = $1"#,
         user_id
     )
     .fetch_optional(db_pool)
-    .await
+    .await?
     {
-        Ok(Some(row)) => Ok(row.status),
-        Ok(None) => Err(StatusCode::NOT_FOUND),
-        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+        Some(row) => Ok(row.status),
+        None => {
+            warn!(%user_id, "User not found");
+            Err(AppError::NotFound("User not found"))
+        }
     }
 }
 
@@ -103,7 +108,7 @@ pub struct TagWithStats {
 
 /// Convert tag nodes to tags with statistics
 fn convert_tags_to_stats(
-    nodes: &[crate::models::TagNode],
+    nodes: &[TagNode],
     tag_frequencies: &std::collections::HashMap<String, u32>,
     total_user_count: u32,
 ) -> Vec<TagWithStats> {

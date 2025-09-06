@@ -5,6 +5,7 @@ use sqlx::PgPool;
 use tracing::{error, info, trace};
 use uuid::Uuid;
 
+use crate::error::AppResult;
 use crate::models::{Form, Gender, TagSystem};
 use crate::utils::{
     constant::MAX_PREVIEW_CANDIDATES,
@@ -240,7 +241,7 @@ impl MatchingService {
     pub async fn generate_match_previews(
         db_pool: &PgPool,
         tag_system: &TagSystem,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    ) -> AppResult<()> {
         info!("Starting match preview generation");
 
         let forms = Self::fetch_unmatched_forms(db_pool).await?;

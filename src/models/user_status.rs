@@ -4,8 +4,9 @@
 //! user_status enum type in the database. Using a Rust enum provides better
 //! performance compared to text conversion and ensures type safety.
 
-use axum::response::IntoResponse;
 use serde::{Deserialize, Serialize};
+
+use crate::error::{AppError, AppResult};
 
 /// Represents the possible status values for a user in the system.
 ///
@@ -82,22 +83,17 @@ impl UserStatus {
     }
 
     /// Queries the database for the user's status by their user ID.
-    pub async fn query(
-        db_pool: &sqlx::PgPool,
-        user_id: &uuid::Uuid,
-    ) -> Result<Self, impl IntoResponse> {
-        use axum::http::StatusCode;
+    pub async fn query(db_pool: &sqlx::PgPool, user_id: &uuid::Uuid) -> AppResult<Self> {
         let user_status_result = sqlx::query!(
             r#"SELECT status as "status: UserStatus" FROM users WHERE id = $1"#,
             user_id
         )
         .fetch_optional(db_pool)
-        .await;
+        .await?;
 
         match user_status_result {
-            Ok(Some(row)) => Ok(row.status),
-            Ok(None) => Err((StatusCode::NOT_FOUND, "User not found")),
-            Err(_) => Err((StatusCode::INTERNAL_SERVER_ERROR, "Database error")),
+            Some(row) => Ok(row.status),
+            None => Err(AppError::NotFound("User not found")),
         }
     }
 }

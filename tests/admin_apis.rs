@@ -1,4 +1,4 @@
-use serde_json::{Value, json};
+use serde_json::Value;
 use sqlx::PgPool;
 
 mod common;
@@ -30,7 +30,7 @@ async fn test_admin_user_overview(db_pool: PgPool) {
     let client = reqwest::Client::new();
 
     let response = client
-        .get(&format!("{}/api/admin/users", app.address))
+        .get(format!("{}/api/admin/users", app.address))
         .send()
         .await
         .expect("Failed to execute request");
@@ -70,7 +70,7 @@ async fn test_admin_user_detail(db_pool: PgPool) {
     let client = reqwest::Client::new();
 
     let response = client
-        .get(&format!("{}/api/admin/user/{}", app.address, user_id))
+        .get(format!("{}/api/admin/user/{}", app.address, user_id))
         .send()
         .await
         .expect("Failed to execute request");
@@ -134,7 +134,7 @@ async fn test_admin_user_stats(db_pool: PgPool) {
     let client = reqwest::Client::new();
 
     let response = client
-        .get(&format!("{}/api/admin/stats", app.address))
+        .get(format!("{}/api/admin/stats", app.address))
         .send()
         .await
         .expect("Failed to execute request");
@@ -180,7 +180,7 @@ async fn test_admin_tags_with_stats(db_pool: PgPool) {
     let client = reqwest::Client::new();
 
     let response = client
-        .get(&format!("{}/api/admin/tags", app.address))
+        .get(format!("{}/api/admin/tags", app.address))
         .send()
         .await
         .expect("Failed to execute request");
@@ -243,7 +243,7 @@ async fn test_admin_final_matches(db_pool: PgPool) {
     let client = reqwest::Client::new();
 
     let response = client
-        .get(&format!("{}/api/admin/matches", app.address))
+        .get(format!("{}/api/admin/matches", app.address))
         .send()
         .await
         .expect("Failed to execute request");

@@ -1,9 +1,5 @@
 use std::collections::HashSet;
 
-use axum::{
-    http::StatusCode,
-    response::{IntoResponse, Response},
-};
 use serde::{Deserialize, Serialize};
 use tracing::warn;
 use uuid::Uuid;
@@ -36,11 +32,11 @@ pub struct Form {
 }
 
 impl FormRequest {
-    pub fn validate_request(&self, tag_system: &TagSystem) -> Option<Response> {
+    pub fn validate_request(&self, tag_system: &TagSystem) -> Result<(), &'static str> {
         // Validate wechat_id
         if self.wechat_id.is_empty() {
             warn!("wechat_id cannot be empty");
-            return Some((StatusCode::BAD_REQUEST, "wechat_id cannot be empty").into_response());
+            return Err("wechat_id cannot be empty");
         }
         if self.wechat_id.len() > MAX_WECHAT_ID_LENGTH {
             warn!(
@@ -48,7 +44,7 @@ impl FormRequest {
                 self.wechat_id.len(),
                 MAX_WECHAT_ID_LENGTH
             );
-            return Some((StatusCode::BAD_REQUEST, "wechat_id too long").into_response());
+            return Err("wechat_id too long");
         }
 
         // Validate total tags limit
@@ -60,7 +56,7 @@ impl FormRequest {
                 "User submitted {} tags, exceeding limit of {}",
                 user_total_tags, total_tags
             );
-            return Some((StatusCode::BAD_REQUEST, "Total tags exceed limit").into_response());
+            return Err("Total tags exceed limit");
         }
 
         // Validate all tags exist in the tag system
@@ -69,25 +65,21 @@ impl FormRequest {
         for tag in &self.familiar_tags {
             if !tag_system.is_matchable(tag) {
                 warn!("Invalid familiar tag: {}", tag);
-                return Some((StatusCode::BAD_REQUEST, "Invalid familiar tag").into_response());
+                return Err("Invalid familiar tag");
             }
             if !all_tags.insert(tag) {
                 warn!("Duplicate tag found in familiar_tags: {}", tag);
-                return Some(
-                    (StatusCode::BAD_REQUEST, "Duplicate tag not allowed").into_response(),
-                );
+                return Err("Duplicate tag not allowed");
             }
         }
         for tag in &self.aspirational_tags {
             if !tag_system.is_matchable(tag) {
                 warn!("Invalid aspirational tag: {}", tag);
-                return Some((StatusCode::BAD_REQUEST, "Invalid aspirational tag").into_response());
+                return Err("Invalid aspirational tag");
             }
             if !all_tags.insert(tag) {
                 warn!("Duplicate tag found in aspirational_tags: {}", tag);
-                return Some(
-                    (StatusCode::BAD_REQUEST, "Duplicate tag not allowed").into_response(),
-                );
+                return Err("Duplicate tag not allowed");
             }
         }
 
@@ -98,7 +90,7 @@ impl FormRequest {
                 self.recent_topics.len(),
                 MAX_TEXT_FIELD_LENGTH
             );
-            return Some((StatusCode::BAD_REQUEST, "recent_topics too long").into_response());
+            return Err("recent_topics too long");
         }
         if self.self_intro.len() > MAX_TEXT_FIELD_LENGTH {
             warn!(
@@ -106,7 +98,7 @@ impl FormRequest {
                 self.self_intro.len(),
                 MAX_TEXT_FIELD_LENGTH
             );
-            return Some((StatusCode::BAD_REQUEST, "self_intro too long").into_response());
+            return Err("self_intro too long");
         }
 
         // TODO: validate self_traits and ideal_traits tags exist (see traits.json) and each field must contain no more than TOTAL_TRAITS (see .env) tags
@@ -117,15 +109,9 @@ impl FormRequest {
                 "Invalid physical_boundary value: {}",
                 self.physical_boundary
             );
-            return Some(
-                (
-                    StatusCode::BAD_REQUEST,
-                    "physical_boundary must be between 1 and 3",
-                )
-                    .into_response(),
-            );
+            return Err("physical_boundary must be between 1 and 3");
         }
 
-        None
+        Ok(())
     }
 }

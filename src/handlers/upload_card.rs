@@ -18,10 +18,11 @@ use axum::{
 };
 use tracing::{debug, error, info, instrument, trace, warn};
 
+use crate::error::{AppError, AppResult};
 use crate::middleware::AuthUser;
 use crate::models::{AppState, UserStatus};
+use crate::utils::file::{FileManager, ImageUploadValidator};
 use crate::utils::static_object::{ALLOWED_GRADES, UPLOAD_DIR};
-use crate::utils::upload::{FileManager, ImageUploadValidator};
 
 /// Uploads a student card for verification.
 ///
@@ -61,71 +62,52 @@ pub async fn upload_card(
     State(state): State<Arc<AppState>>,
     Extension(user): Extension<AuthUser>,
     mut multipart: Multipart,
-) -> impl IntoResponse {
+) -> AppResult<impl IntoResponse> {
     debug!("Processing card upload request");
 
     // Check user status - only unverified users can upload
-    let user_status = match UserStatus::query(&state.db_pool, &user.user_id).await {
-        Ok(status) => status,
-        Err(resp) => {
-            error!("Failed to query user status from database");
-            return resp.into_response();
-        }
-    };
+    let user_status = UserStatus::query(&state.db_pool, &user.user_id).await?;
 
     if !user_status.can_upload_card() {
         warn!(current_status = %user_status, "User status doesn't allow card upload");
-        return (
-            StatusCode::FORBIDDEN,
-            "User status doesn't allow card upload",
-        )
-            .into_response();
+        return Err(AppError::Forbidden("User status doesn't allow card upload"));
     }
 
     // Extract fields from multipart form
     let mut file_data = None;
     let mut grade = None;
 
-    while let Some(field) = match multipart.next_field().await {
-        Ok(field) => field,
-        Err(e) => {
-            error!(error = %e, "Error reading multipart form");
-            return (StatusCode::BAD_REQUEST, "Invalid multipart data").into_response();
-        }
-    } {
+    while let Some(field) = multipart.next_field().await.map_err(|e| {
+        error!(error = %e, "Error reading multipart form");
+        AppError::BadRequest("Invalid multipart data")
+    })? {
         let field_name = field.name().unwrap_or("");
 
         match field_name {
             "card" => {
                 // Validate content type
                 let content_type = field.content_type().unwrap_or("");
-                if let Err(e) = ImageUploadValidator::validate_content_type(content_type) {
+                ImageUploadValidator::validate_content_type(content_type).map_err(|e| {
                     warn!(content_type = %content_type, error = %e, "Invalid content type");
-                    return (StatusCode::BAD_REQUEST, e).into_response();
-                }
+                    AppError::BadRequest(e)
+                })?;
 
                 // Read file data
-                file_data = Some(match field.bytes().await {
-                    Ok(data) => data,
-                    Err(e) => {
-                        error!(error = %e, "Error reading file data");
-                        return (StatusCode::BAD_REQUEST, "Error reading file").into_response();
-                    }
-                });
+                file_data = Some(field.bytes().await.map_err(|e| {
+                    error!(error = %e, "Error reading file data");
+                    AppError::BadRequest("Error reading file")
+                })?);
             }
             "grade" => {
-                let grade_local = match field.text().await {
-                    Ok(text) => text,
-                    Err(e) => {
-                        error!(error = %e, "Error reading grade field");
-                        return (StatusCode::BAD_REQUEST, "Error reading grade").into_response();
-                    }
-                };
+                let grade_local = field.text().await.map_err(|e| {
+                    error!(error = %e, "Error reading grade field");
+                    AppError::BadRequest("Error reading grade")
+                })?;
 
                 // Validate grade
                 if !ALLOWED_GRADES.contains(&grade_local.as_str()) {
                     warn!(grade = %grade_local, "Invalid grade");
-                    return (StatusCode::BAD_REQUEST, "Error reading grade").into_response();
+                    return Err(AppError::BadRequest("Invalid grade"));
                 }
 
                 grade = Some(grade_local);
@@ -137,59 +119,55 @@ pub async fn upload_card(
     }
 
     // Validate required fields
-    let file_data = match file_data {
-        Some(data) => data,
-        None => {
-            warn!("No file provided in multipart form");
-            return (StatusCode::BAD_REQUEST, "No file provided").into_response();
-        }
-    };
+    let file_data = file_data.ok_or_else(|| {
+        warn!("No file provided in multipart form");
+        AppError::BadRequest("No file provided")
+    })?;
 
-    let grade = match grade {
-        Some(g) => g,
-        None => {
-            warn!("No grade provided in multipart form");
-            return (StatusCode::BAD_REQUEST, "Grade field is required").into_response();
-        }
-    };
+    let grade = grade.ok_or_else(|| {
+        warn!("No grade provided in multipart form");
+        AppError::BadRequest("Grade field is required")
+    })?;
 
     // Validate file is not empty
-    if let Err(e) = ImageUploadValidator::validate_file_not_empty(&file_data) {
+    ImageUploadValidator::validate_file_not_empty(&file_data).map_err(|e| {
         warn!(error = %e, "Empty file uploaded");
-        return (StatusCode::BAD_REQUEST, e).into_response();
-    }
+        AppError::BadRequest(e)
+    })?;
 
     // Validate image format using image crate
-    let (file_extension, image_format) =
-        match ImageUploadValidator::validate_image_format(&file_data) {
-            Ok((ext, format)) => (ext, format),
-            Err(e) => {
-                warn!(error = %e, "Invalid image format");
-                return (StatusCode::BAD_REQUEST, e).into_response();
-            }
-        };
+    let (file_extension, image_format) = ImageUploadValidator::validate_image_format(&file_data)
+        .map_err(|e| {
+            warn!(error = %e, "Invalid image format");
+            AppError::BadRequest(e)
+        })?;
 
     trace!(format = ?image_format, size = file_data.len(), "Image validation passed");
 
     // Prepare file storage
     let card_photos_dir = Path::new(UPLOAD_DIR.as_str()).join("card_photos");
-    if let Err(e) = FileManager::ensure_directory_exists(&card_photos_dir).await {
-        error!(error = %e, "Failed to create upload directory");
-        return (StatusCode::INTERNAL_SERVER_ERROR, "File system error").into_response();
-    }
+    FileManager::ensure_directory_exists(&card_photos_dir)
+        .await
+        .map_err(|e| {
+            error!(error = %e, "Failed to create upload directory");
+            AppError::Internal
+        })?;
+
     let filename = FileManager::generate_user_filename(user.user_id, file_extension);
     let full_path = card_photos_dir.join(&filename);
 
     debug!(file_path = %full_path.display(), grade = %grade, "Saving file");
 
     // Write file to disk
-    if let Err(e) = FileManager::save_file(&full_path, &file_data).await {
-        error!(error = %e, "Failed to save file");
-        return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to save file").into_response();
-    }
+    FileManager::save_file(&full_path, &file_data)
+        .await
+        .map_err(|e| {
+            error!(error = %e, "Failed to save file");
+            AppError::Internal
+        })?;
 
     // Update database with file path, grade, and status
-    match sqlx::query!(
+    sqlx::query!(
         "UPDATE users SET card_photo_filename = $1, grade = $2, status = $3 WHERE id = $4",
         filename,
         grade,
@@ -197,22 +175,13 @@ pub async fn upload_card(
         user.user_id
     )
     .execute(&state.db_pool)
-    .await
-    {
-        Ok(_) => {
-            info!(
-                file_size = file_data.len(),
-                grade = %grade,
-                "Card uploaded successfully, status updated to verification_pending"
-            );
-        }
-        Err(e) => {
-            error!(error = %e, "Failed to update database with file path and status");
-            // Try to clean up the file
-            FileManager::cleanup_file(&full_path).await;
-            return (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response();
-        }
-    }
+    .await?;
 
-    (StatusCode::OK, "Verification pending").into_response()
+    info!(
+        file_size = file_data.len(),
+        grade = %grade,
+        "Card uploaded successfully, status updated to verification_pending"
+    );
+
+    Ok(StatusCode::OK)
 }

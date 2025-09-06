@@ -14,12 +14,13 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use tokio::fs;
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{debug, info, instrument, warn};
 use uuid::Uuid;
 
+use crate::error::{AppError, AppResult};
 use crate::middleware::AuthUser;
 use crate::models::{AppState, Form, Gender, UserStatus};
-use crate::utils::{static_object::UPLOAD_DIR, upload};
+use crate::utils::{file, static_object::UPLOAD_DIR};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FormRequest {
@@ -61,41 +62,31 @@ pub async fn submit_form(
     State(state): State<Arc<AppState>>,
     Extension(user): Extension<AuthUser>,
     Json(payload): Json<FormRequest>,
-) -> impl IntoResponse {
+) -> AppResult<StatusCode> {
     debug!("Processing form submission request");
 
     // Check user status - only verified and form_completed users can submit
-    let user_status = match UserStatus::query(&state.db_pool, &user.user_id).await {
-        Ok(status) => status,
-        Err(resp) => {
-            error!("Failed to query user status from database");
-            return resp.into_response();
-        }
-    };
+    let user_status = UserStatus::query(&state.db_pool, &user.user_id).await?;
 
     if !user_status.can_fill_form() {
         warn!(current_status = %user_status, "User status doesn't allow form submission");
-        return (
-            StatusCode::FORBIDDEN,
+        return Err(AppError::Forbidden(
             "User status doesn't allow form submission",
-        )
-            .into_response();
+        ));
     }
 
     // Validate each field of the form
-    if let Some(err_resp) = payload.validate_request(state.tag_system) {
-        return err_resp;
-    }
+    payload
+        .validate_request(state.tag_system)
+        .map_err(AppError::BadRequest)?;
 
     // Validate profile photo filename if provided
-    if let Some(ref filename) = payload.profile_photo_filename
-        && let Err(resp) = validate_profile_photo_filename(filename, &user.user_id).await
-    {
-        return resp.into_response();
+    if let Some(ref filename) = payload.profile_photo_filename {
+        validate_profile_photo_filename(filename, &user.user_id).await?;
     }
 
     // Insert or update form data
-    let result = sqlx::query!(
+    sqlx::query!(
         r#"
         INSERT INTO forms (user_id, gender, familiar_tags, aspirational_tags, recent_topics,
                           self_traits, ideal_traits, physical_boundary, self_intro, profile_photo_filename)
@@ -124,57 +115,31 @@ pub async fn submit_form(
         payload.profile_photo_filename
     )
     .execute(&state.db_pool)
-    .await;
+    .await?;
 
-    match result {
-        Ok(_) => {
-            // Update wechat_id in users table
-            let wechat_update_result = sqlx::query!(
-                "UPDATE users SET wechat_id = $1 WHERE id = $2",
-                payload.wechat_id,
-                user.user_id
-            )
-            .execute(&state.db_pool)
-            .await;
+    // Update wechat_id in users table
+    sqlx::query!(
+        "UPDATE users SET wechat_id = $1 WHERE id = $2",
+        payload.wechat_id,
+        user.user_id
+    )
+    .execute(&state.db_pool)
+    .await?;
 
-            if let Err(e) = wechat_update_result {
-                error!(error = %e, "Failed to update wechat_id in users table");
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Failed to update wechat_id",
-                )
-                    .into_response();
-            }
+    // Update user status to form_completed if currently verified
+    if user_status == UserStatus::Verified {
+        sqlx::query!(
+            "UPDATE users SET status = 'form_completed' WHERE id = $1",
+            user.user_id
+        )
+        .execute(&state.db_pool)
+        .await?;
 
-            // Update user status to form_completed if currently verified
-            if user_status == UserStatus::Verified {
-                let update_result = sqlx::query!(
-                    "UPDATE users SET status = 'form_completed' WHERE id = $1",
-                    user.user_id
-                )
-                .execute(&state.db_pool)
-                .await;
-
-                if let Err(e) = update_result {
-                    error!(error = %e, "Failed to update user status to form_completed");
-                    return (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        "Failed to update user status",
-                    )
-                        .into_response();
-                }
-
-                info!("User status updated to form_completed");
-            }
-
-            info!("Form submitted successfully");
-            (StatusCode::OK, "Form submitted successfully").into_response()
-        }
-        Err(e) => {
-            error!(error = %e, "Database error when submitting form");
-            (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response()
-        }
+        info!("User status updated to form_completed");
     }
+
+    info!("Form submitted successfully");
+    Ok(StatusCode::OK)
 }
 
 /// Retrieves the authenticated user's form data.
@@ -186,7 +151,7 @@ pub async fn submit_form(
 ///
 /// # Returns
 ///
-/// - `200 OK` - Form data retrieved successfully
+/// - `200 OK` with `Form` - Form data retrieved successfully
 /// - `401 Unauthorized` - Missing or invalid authentication token
 /// - `404 Not Found` - User has not submitted a form yet
 /// - `500 Internal Server Error` - Database error
@@ -200,10 +165,10 @@ pub async fn submit_form(
 pub async fn get_form(
     State(state): State<Arc<AppState>>,
     Extension(user): Extension<AuthUser>,
-) -> impl IntoResponse {
+) -> AppResult<impl IntoResponse> {
     debug!("Processing get form request");
 
-    let result = sqlx::query_as!(
+    let form = sqlx::query_as!(
         Form,
         r#"
         SELECT user_id, gender as "gender: Gender", familiar_tags, aspirational_tags,
@@ -215,28 +180,17 @@ pub async fn get_form(
         user.user_id
     )
     .fetch_optional(&state.db_pool)
-    .await;
+    .await?
+    .ok_or_else(|| {
+        info!("User has not submitted a form yet");
+        AppError::NotFound("Form not found")
+    })?;
 
-    match result {
-        Ok(Some(form)) => {
-            info!("Form retrieved successfully");
-            (StatusCode::OK, Json(form)).into_response()
-        }
-        Ok(None) => {
-            info!("User has not submitted a form yet");
-            (StatusCode::NOT_FOUND, "Form not found").into_response()
-        }
-        Err(e) => {
-            error!(error = %e, "Database error when fetching form");
-            (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response()
-        }
-    }
+    info!("Form retrieved successfully");
+    Ok((StatusCode::OK, Json(form)))
 }
 
-async fn validate_profile_photo_filename(
-    filename: &str,
-    user_id: &Uuid,
-) -> Result<(), impl IntoResponse> {
+async fn validate_profile_photo_filename(filename: &str, user_id: &Uuid) -> Result<(), AppError> {
     // Security checks: ensure filename is not malicious
     if filename.contains("..")
         || !filename
@@ -244,26 +198,22 @@ async fn validate_profile_photo_filename(
             .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '.')
     {
         warn!("Profile photo filename contains forbidden characters");
-        return Err((
-            StatusCode::BAD_REQUEST,
+        return Err(AppError::BadRequest(
             "Profile photo filename contains forbidden characters",
         ));
     }
 
-    let photo_uuid = match upload::FileManager::parse_uuid_from_path(filename) {
-        Some(uuid) => uuid,
-        None => {
-            warn!("Invalid profile photo filename format: {}", filename);
-            return Err((StatusCode::BAD_REQUEST, "Invalid profile photo filename"));
-        }
-    };
+    let photo_uuid = file::FileManager::parse_uuid_from_path(filename).ok_or_else(|| {
+        warn!("Invalid profile photo filename format: {}", filename);
+        AppError::BadRequest("Invalid profile photo filename")
+    })?;
 
     if photo_uuid != *user_id {
         warn!(
             "Photo UUID {} doesn't match user ID {}",
             photo_uuid, user_id
         );
-        return Err((StatusCode::BAD_REQUEST, "Photo UUID doesn't match user ID"));
+        return Err(AppError::BadRequest("Photo UUID doesn't match user ID"));
     }
 
     let full_path = Path::new(UPLOAD_DIR.as_str())
@@ -271,7 +221,7 @@ async fn validate_profile_photo_filename(
         .join(filename);
     if !fs::try_exists(&full_path).await.unwrap_or(false) {
         warn!("Profile photo file doesn't exist: {:?}", full_path);
-        return Err((StatusCode::BAD_REQUEST, "Profile photo file doesn't exist"));
+        return Err(AppError::BadRequest("Profile photo file doesn't exist"));
     }
 
     Ok(())

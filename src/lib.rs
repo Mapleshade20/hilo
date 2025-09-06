@@ -7,6 +7,7 @@
 //! - [`services`] - Business logic services (email, JWT, etc.)
 //! - [`utils`] - Utility functions and constants
 
+pub mod error;
 pub mod handlers;
 pub mod middleware;
 pub mod models;
