@@ -46,7 +46,7 @@ pub struct FormRequest {
 ///
 /// # Returns
 ///
-/// - `200 OK` - Form submitted/updated successfully
+/// - `200 OK` with `Form` - Form submitted/updated successfully
 /// - `400 Bad Request` - Invalid form data or validation errors
 /// - `401 Unauthorized` - Missing or invalid authentication token
 /// - `403 Forbidden` - User status doesn't allow form submission
@@ -62,7 +62,7 @@ pub async fn submit_form(
     State(state): State<Arc<AppState>>,
     Extension(user): Extension<AuthUser>,
     Json(payload): Json<FormRequest>,
-) -> AppResult<StatusCode> {
+) -> AppResult<impl IntoResponse> {
     debug!("Processing form submission request");
 
     // Check user status - only verified and form_completed users can submit
@@ -85,8 +85,9 @@ pub async fn submit_form(
         validate_profile_photo_filename(filename, &user.user_id).await?;
     }
 
-    // Insert or update form data
-    sqlx::query!(
+    // Insert or update form data and return the result
+    let form = sqlx::query_as!(
+        Form,
         r#"
         INSERT INTO forms (user_id, gender, familiar_tags, aspirational_tags, recent_topics,
                           self_traits, ideal_traits, physical_boundary, self_intro, profile_photo_filename)
@@ -102,6 +103,9 @@ pub async fn submit_form(
             physical_boundary = EXCLUDED.physical_boundary,
             self_intro = EXCLUDED.self_intro,
             profile_photo_filename = EXCLUDED.profile_photo_filename
+        RETURNING user_id, gender as "gender: Gender", familiar_tags, aspirational_tags,
+                  recent_topics, self_traits, ideal_traits, physical_boundary,
+                  self_intro, profile_photo_filename
         "#,
         user.user_id,
         payload.gender as Gender,
@@ -114,7 +118,7 @@ pub async fn submit_form(
         payload.self_intro,
         payload.profile_photo_filename
     )
-    .execute(&state.db_pool)
+    .fetch_one(&state.db_pool)
     .await?;
 
     // Update wechat_id in users table
@@ -135,11 +139,12 @@ pub async fn submit_form(
         .execute(&state.db_pool)
         .await?;
 
-        info!("User status updated to form_completed");
+        debug!("User status updated to form_completed");
     }
 
     info!("Form submitted successfully");
-    Ok(StatusCode::OK)
+
+    Ok((StatusCode::OK, Json(form)))
 }
 
 /// Retrieves the authenticated user's form data.

@@ -20,13 +20,19 @@ use crate::error::{AppError, AppResult};
 use crate::models::AppState;
 use crate::utils::static_object::UPLOAD_DIR;
 
-/// Serve partner's profile photo
+/// Serves partner's profile photo for matched users.
 ///
 /// GET /api/images/partner/{filename}
 ///
 /// This endpoint serves profile photos for matched partners only.
 /// It requires authentication and validates that the requesting user
 /// is actually matched with the user whose photo is being requested.
+///
+/// # Returns
+///
+/// - `200 OK` with image file - Partner's profile photo served successfully
+/// - `404 Not Found` - User not found or no profile photo available
+/// - `500 Internal Server Error` - Database or file system error
 #[instrument(skip_all, fields(request_id = %uuid::Uuid::new_v4()))]
 pub async fn serve_partner_image(
     State(state): State<Arc<AppState>>,

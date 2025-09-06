@@ -32,7 +32,7 @@ async fn complete_auth_flow(
         .send()
         .await
         .expect("Failed to send code");
-    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    assert_eq!(response.status(), reqwest::StatusCode::ACCEPTED);
 
     // Extract code from email
     let sent_email = mock_emailer.last_sent_email().expect("No email sent");
@@ -118,7 +118,7 @@ async fn test_verify_code_wrong_code(pool: PgPool) {
         .send()
         .await
         .expect("Failed to send code");
-    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    assert_eq!(response.status(), reqwest::StatusCode::ACCEPTED);
 
     // Extract code from email
     let sent_email = mock_emailer.last_sent_email().expect("No email sent");
@@ -257,7 +257,7 @@ async fn test_multiple_users_different_codes(pool: PgPool) {
             .send()
             .await
             .expect("Failed to send code");
-        assert_eq!(response.status(), reqwest::StatusCode::OK);
+        assert_eq!(response.status(), reqwest::StatusCode::ACCEPTED);
     }
 
     assert_eq!(mock_emailer.sent_count(), users.len());

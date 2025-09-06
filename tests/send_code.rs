@@ -20,7 +20,7 @@ async fn send_verification_code_works(pool: PgPool) {
             .await
             .expect("Failed to execute request");
 
-        assert_eq!(response.status(), reqwest::StatusCode::OK);
+        assert_eq!(response.status(), reqwest::StatusCode::ACCEPTED);
 
         let body = response.text().await.expect("Failed to read response body");
         assert_eq!(body, "Verification code sent");
@@ -72,7 +72,7 @@ async fn send_verification_code_rate_limit(pool: PgPool) {
         .await
         .expect("Failed to execute first request");
 
-    assert_eq!(response1.status(), reqwest::StatusCode::OK);
+    assert_eq!(response1.status(), reqwest::StatusCode::ACCEPTED);
     assert_eq!(mock_emailer.sent_count(), 1);
 
     // Send second request immediately (should be rate limited)

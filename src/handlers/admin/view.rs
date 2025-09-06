@@ -1,3 +1,20 @@
+//! # Admin View Handlers
+//!
+//! This module implements read-only administrative endpoints for viewing
+//! application data. These endpoints provide paginated access to user information,
+//! detailed user profiles, tag statistics, final match results, and overall
+//! system statistics.
+//!
+//! # Security
+//!
+//! All endpoints in this module are admin-only and should be protected
+//! by appropriate authentication middleware in the router configuration.
+//!
+//! # Pagination
+//!
+//! List endpoints support pagination with configurable page size (1-100 items)
+//! and include pagination metadata in responses.
+
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -61,7 +78,18 @@ pub struct PaginationInfo {
     pub total_pages: u32,
 }
 
-/// Admin endpoint to get users overview with pagination
+/// Gets a paginated overview of all users in the system.
+///
+/// GET /api/admin/users ?page=1&limit=20
+///
+/// This endpoint returns a paginated list of all users with basic information
+/// (ID, email, status). Results are ordered by creation date (newest first).
+/// Supports pagination with configurable page size (1-100 items per page).
+///
+/// # Returns
+///
+/// - `200 OK` with `PaginatedResponse<UserOverview>` - Users retrieved successfully
+/// - `500 Internal Server Error` - Database error
 #[instrument(skip_all, fields(request_id = %uuid::Uuid::new_v4()))]
 pub async fn get_users_overview(
     State(state): State<Arc<AdminState>>,
@@ -107,7 +135,19 @@ pub async fn get_users_overview(
     Ok((StatusCode::OK, Json(response)).into_response())
 }
 
-/// Admin endpoint to serve user card photos
+/// Serves student card photos for admin review.
+///
+/// GET /api/admin/users/{filename}
+///
+/// This endpoint serves student verification card photos stored in the filesystem.
+/// Used by admins to review submitted cards during the user verification process.
+/// Files are served directly from the card_photos directory.
+///
+/// # Returns
+///
+/// - `200 OK` with image file - Card photo served successfully
+/// - `404 Not Found` - Card photo file not found
+/// - `500 Internal Server Error` - File system error
 #[instrument(skip_all, fields(request_id = %uuid::Uuid::new_v4()))]
 pub async fn serve_user_card_photo(
     AxumPath(filename): AxumPath<String>,
@@ -161,7 +201,19 @@ pub struct UserFormInfo {
     pub profile_photo_uri: Option<String>,
 }
 
-/// Admin endpoint to get detailed user information
+/// Gets detailed information for a specific user.
+///
+/// GET /api/admin/user/{user_id}
+///
+/// This endpoint returns comprehensive user information including basic profile data,
+/// form responses (if submitted), and links to uploaded files. Used by admins for
+/// detailed user review and verification processes.
+///
+/// # Returns
+///
+/// - `200 OK` with `UserDetailResponse` - User details retrieved successfully
+/// - `404 Not Found` - User not found
+/// - `500 Internal Server Error` - Database error
 #[instrument(skip_all, fields(request_id = %uuid::Uuid::new_v4()))]
 pub async fn get_user_detail(
     State(state): State<Arc<AdminState>>,
@@ -234,7 +286,18 @@ pub async fn get_user_detail(
     Ok((StatusCode::OK, Json(response)).into_response())
 }
 
-/// Admin endpoint to get tag structure with user counts and IDF scores
+/// Gets the tag system structure with usage statistics.
+///
+/// GET /api/admin/tags
+///
+/// This endpoint returns the complete tag hierarchy with user count and IDF
+/// (Inverse Document Frequency) scores for each tag. Used by admins to understand
+/// tag usage patterns and matching algorithm behavior.
+///
+/// # Returns
+///
+/// - `200 OK` with `Vec<TagWithStats>` - Tag statistics retrieved successfully
+/// - `500 Internal Server Error` - Database error
 #[instrument(skip_all, fields(request_id = %uuid::Uuid::new_v4()))]
 pub async fn get_tags_with_stats(
     State(state): State<Arc<AdminState>>,
@@ -273,7 +336,18 @@ pub struct FinalMatchOverview {
     pub score: f64,
 }
 
-/// Admin endpoint to get final matches overview with pagination
+/// Gets a paginated overview of all final matches.
+///
+/// GET /api/admin/matches ?page=1&limit=20
+///
+/// This endpoint returns a paginated list of final matches created by the matching
+/// algorithm, including match scores and participant email addresses. Results are
+/// ordered by match score (highest first). Used by admins to review match quality.
+///
+/// # Returns
+///
+/// - `200 OK` with `PaginatedResponse<FinalMatchOverview>` - Final matches retrieved successfully
+/// - `500 Internal Server Error` - Database error
 #[instrument(skip_all, fields(request_id = %uuid::Uuid::new_v4()))]
 pub async fn get_final_matches(
     State(state): State<Arc<AdminState>>,
@@ -351,7 +425,18 @@ pub struct UserStatsResponse {
     pub unmatched_females: i64,
 }
 
-/// Admin endpoint to get user statistics
+/// Gets overall user and gender statistics.
+///
+/// GET /api/admin/stats
+///
+/// This endpoint returns aggregate statistics about users, including total counts,
+/// gender distribution among users with completed forms, and unmatched user counts
+/// by gender. Used by admins for system monitoring and matching insights.
+///
+/// # Returns
+///
+/// - `200 OK` with `UserStatsResponse` - User statistics retrieved successfully
+/// - `500 Internal Server Error` - Database error
 #[instrument(skip_all, fields(request_id = %uuid::Uuid::new_v4()))]
 pub async fn get_user_stats(State(state): State<Arc<AdminState>>) -> AppResult<impl IntoResponse> {
     // Get total user count

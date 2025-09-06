@@ -1,3 +1,20 @@
+//! # Admin Action Handlers
+//!
+//! This module implements administrative action endpoints that modify application
+//! state. These endpoints allow administrators to trigger system operations like
+//! final matching, update match previews, and manage user verification status.
+//!
+//! # Security
+//!
+//! All endpoints in this module perform write operations and should be protected
+//! by appropriate admin authentication middleware in the router configuration.
+//!
+//! # Operations
+//!
+//! - **Final Matching** - Executes the matching algorithm to create final pairs
+//! - **Match Previews** - Regenerates preview suggestions for all users
+//! - **User Verification** - Changes user status for verification workflow
+
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -9,11 +26,19 @@ use uuid::Uuid;
 
 use super::{
     AdminState, build_veto_map, calculate_tag_frequencies, create_final_match, fetch_all_vetoes,
-    get_user_id_by_email, get_user_status, is_vetoed, update_user_status,
+    get_user_id_by_email, get_user_status, is_vetoed,
 };
 use crate::error::{AppError, AppResult};
 use crate::models::{FinalMatch, TagSystem, UserStatus};
 use crate::services::matching::MatchingService;
+
+#[derive(Debug, Serialize)]
+pub struct TriggerMatchingResponse {
+    pub success: bool,
+    pub message: &'static str,
+    pub matches_created: usize,
+    pub matches: Vec<FinalMatch>,
+}
 
 #[derive(Debug, Serialize)]
 pub struct ActionResponse {
@@ -21,7 +46,19 @@ pub struct ActionResponse {
     pub message: &'static str,
 }
 
-/// Admin endpoint to trigger the final matching algorithm
+/// Executes the final matching algorithm to create user pairs.
+///
+/// POST /api/admin/trigger-match
+///
+/// This endpoint triggers the final matching algorithm which uses a greedy approach
+/// to create optimal pairs from users with completed forms. The algorithm respects
+/// user vetoes, clears all vetoes and match previews after completion, and updates
+/// matched users' status to 'matched'.
+///
+/// # Returns
+///
+/// - `200 OK` with `TriggerMatchingResponse` - Final matching completed successfully
+/// - `500 Internal Server Error` - Matching algorithm failure
 #[instrument(skip_all, fields(request_id = %uuid::Uuid::new_v4()))]
 pub async fn trigger_final_matching(
     State(state): State<Arc<AdminState>>,
@@ -36,9 +73,11 @@ pub async fn trigger_final_matching(
     info!("Final matching completed: {} pairs", matches.len());
     Ok((
         StatusCode::OK,
-        Json(ActionResponse {
+        Json(TriggerMatchingResponse {
             success: true,
             message: "Final matching completed successfully",
+            matches_created: matches.len(),
+            matches,
         }),
     )
         .into_response())
@@ -138,7 +177,18 @@ async fn execute_final_matching(
     Ok(final_matches)
 }
 
-/// Admin endpoint to manually update match previews
+/// Manually regenerates match previews for all eligible users.
+///
+/// POST /api/admin/update-previews
+///
+/// This endpoint triggers regeneration of match preview suggestions for users
+/// with completed forms. Match previews are used to show potential matches
+/// before final matching occurs, allowing users to veto unwanted suggestions.
+///
+/// # Returns
+///
+/// - `200 OK` with `ActionResponse` - Match previews updated successfully
+/// - `500 Internal Server Error` - Preview generation failure
 #[instrument(skip_all, fields(request_id = %uuid::Uuid::new_v4()))]
 pub async fn update_match_previews(
     State(state): State<Arc<AdminState>>,
@@ -177,10 +227,33 @@ pub struct VerifyUserRequest {
 pub struct VerifyUserResponse {
     pub success: bool,
     pub message: &'static str,
-    pub user_id: Uuid,
+    pub user: UserData,
 }
 
-/// Admin endpoint to set user verification status
+/// User data structure for verification response
+#[derive(Debug, Serialize)]
+pub struct UserData {
+    pub user_id: Uuid,
+    pub email: String,
+    pub status: UserStatus,
+    pub grade: Option<String>,
+    pub card_photo_filename: Option<String>,
+}
+
+/// Changes user verification status for admin review workflow.
+///
+/// POST /api/admin/verify-user VerifyUserRequest
+///
+/// This endpoint allows administrators to change user status between 'verified'
+/// and 'unverified' as part of the student card verification workflow. Users
+/// must be in 'verification_pending' status to have their status changed.
+///
+/// # Returns
+///
+/// - `200 OK` with `VerifyUserResponse` - User status updated successfully
+/// - `400 Bad Request` - Invalid request parameters or user status
+/// - `404 Not Found` - User not found
+/// - `500 Internal Server Error` - Database error
 #[instrument(skip_all, fields(request_id = %uuid::Uuid::new_v4()))]
 pub async fn verify_user(
     State(state): State<Arc<AdminState>>,
@@ -219,8 +292,15 @@ pub async fn verify_user(
         ));
     }
 
-    // Update user status
-    update_user_status(&state.db_pool, &user_id, payload.status).await?;
+    // Update user status and return updated user data
+    let updated_user = sqlx::query!(
+        r#"UPDATE users SET status = $1 WHERE id = $2
+           RETURNING id, email, status as "status: UserStatus", grade, card_photo_filename"#,
+        payload.status as UserStatus,
+        user_id
+    )
+    .fetch_one(&state.db_pool)
+    .await?;
 
     info!(
         %user_id,
@@ -233,7 +313,13 @@ pub async fn verify_user(
         Json(VerifyUserResponse {
             success: true,
             message: "User status updated successfully",
-            user_id,
+            user: UserData {
+                user_id: updated_user.id,
+                email: updated_user.email,
+                status: updated_user.status,
+                grade: updated_user.grade,
+                card_photo_filename: updated_user.card_photo_filename,
+            },
         }),
     )
         .into_response())

@@ -34,7 +34,8 @@ use crate::utils::static_object::UPLOAD_DIR;
 /// Response structure for successful profile photo upload.
 #[derive(Serialize)]
 struct UploadProfilePhotoResponse {
-    filename: String,
+    pub filename: String,
+    pub status: UserStatus,
 }
 
 /// Uploads a profile photo for verified users.
@@ -59,7 +60,7 @@ struct UploadProfilePhotoResponse {
 ///
 /// # Returns
 ///
-/// - `200 OK` - File uploaded successfully with JSON response containing file path
+/// - `200 OK` with `UploadProfilePhotoResponse` - File uploaded successfully
 /// - `400 Bad Request` - Invalid file format or missing file
 /// - `403 Forbidden` - User status doesn't allow upload
 /// - `413 Payload Too Large` - File exceeds 2MB limit (handled by Axum)
@@ -156,11 +157,20 @@ pub async fn upload_profile_photo(
         "Profile photo uploaded successfully"
     );
 
-    // Return success response with filename (without database update, which should be handled
-    // when user submits their form)
+    // Fetch user data to return in response
+    let user_data = sqlx::query!(
+        r#"SELECT email, status as "status: UserStatus" FROM users WHERE id = $1"#,
+        user.user_id
+    )
+    .fetch_one(&state.db_pool)
+    .await?;
+
+    // Return success response with filename and user data
     Ok((
         StatusCode::OK,
-        Json(UploadProfilePhotoResponse { filename }),
-    )
-        .into_response())
+        Json(UploadProfilePhotoResponse {
+            filename,
+            status: user_data.status,
+        }),
+    ))
 }

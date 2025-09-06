@@ -1,3 +1,29 @@
+//! # Admin Handlers Module
+//!
+//! This module provides administrative endpoints for the Hilo application.
+//! Admin handlers are separated into view endpoints (for retrieving data)
+//! and action endpoints (for performing administrative operations).
+//!
+//! # Available Admin Endpoints
+//!
+//! ## View Endpoints
+//! - **Users Overview** - Paginated list of all users
+//! - **User Details** - Detailed information for specific users
+//! - **User Card Photos** - Serve student verification card photos
+//! - **Tag Statistics** - Tag usage statistics with IDF scores
+//! - **Final Matches** - View all final match results
+//! - **User Statistics** - Overall user and gender statistics
+//!
+//! ## Action Endpoints
+//! - **Trigger Final Matching** - Execute the final matching algorithm
+//! - **Update Match Previews** - Regenerate match preview suggestions
+//! - **Verify Users** - Change user verification status
+//!
+//! # Admin State
+//!
+//! All admin handlers use a shared `AdminState` containing database pool
+//! and tag system references for consistent access to application data.
+
 mod action;
 mod view;
 
@@ -192,21 +218,4 @@ async fn create_final_match(
     )
     .fetch_one(db_pool)
     .await
-}
-
-/// Update user status
-async fn update_user_status(
-    db_pool: &PgPool,
-    user_id: &Uuid,
-    new_status: UserStatus,
-) -> Result<(), sqlx::Error> {
-    sqlx::query!(
-        r#"UPDATE users SET status = $1 WHERE id = $2"#,
-        new_status as UserStatus,
-        user_id
-    )
-    .execute(db_pool)
-    .await?;
-
-    Ok(())
 }

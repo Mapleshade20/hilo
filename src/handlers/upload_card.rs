@@ -12,10 +12,12 @@ use std::path::Path;
 use std::sync::Arc;
 
 use axum::{
+    Json,
     extract::{Extension, Multipart, State},
     http::StatusCode,
     response::IntoResponse,
 };
+use serde::Serialize;
 use tracing::{debug, error, info, instrument, trace, warn};
 
 use crate::error::{AppError, AppResult};
@@ -23,6 +25,15 @@ use crate::middleware::AuthUser;
 use crate::models::{AppState, UserStatus};
 use crate::utils::file::{FileManager, ImageUploadValidator};
 use crate::utils::static_object::{ALLOWED_GRADES, UPLOAD_DIR};
+
+/// Response structure for successful card upload
+#[derive(Serialize)]
+pub struct CardUploadResponse {
+    pub email: String,
+    pub status: UserStatus,
+    pub grade: String,
+    pub card_photo_filename: String,
+}
 
 /// Uploads a student card for verification.
 ///
@@ -46,7 +57,7 @@ use crate::utils::static_object::{ALLOWED_GRADES, UPLOAD_DIR};
 ///
 /// # Returns
 ///
-/// - `200 OK` - File uploaded successfully
+/// - `200 OK` with `CardUploadResponse` - File uploaded successfully
 /// - `400 Bad Request` - Invalid file format or missing file
 /// - `403 Forbidden` - User status doesn't allow upload
 /// - `413 Payload Too Large` - File exceeds 2MB limit (handled by Axum)
@@ -166,15 +177,16 @@ pub async fn upload_card(
             AppError::Internal
         })?;
 
-    // Update database with file path, grade, and status
-    sqlx::query!(
-        "UPDATE users SET card_photo_filename = $1, grade = $2, status = $3 WHERE id = $4",
+    // Update database with file path, grade, and status, returning user data
+    let user_data = sqlx::query!(
+        r#"UPDATE users SET card_photo_filename = $1, grade = $2, status = $3 WHERE id = $4
+           RETURNING email, status as "status: UserStatus", grade, card_photo_filename"#,
         filename,
         grade,
         UserStatus::VerificationPending as UserStatus,
         user.user_id
     )
-    .execute(&state.db_pool)
+    .fetch_one(&state.db_pool)
     .await?;
 
     info!(
@@ -183,5 +195,13 @@ pub async fn upload_card(
         "Card uploaded successfully, status updated to verification_pending"
     );
 
-    Ok(StatusCode::OK)
+    Ok((
+        StatusCode::OK,
+        Json(CardUploadResponse {
+            email: user_data.email,
+            status: user_data.status,
+            grade: user_data.grade.unwrap_or_default(),
+            card_photo_filename: user_data.card_photo_filename.unwrap_or_default(),
+        }),
+    ))
 }

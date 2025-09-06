@@ -188,7 +188,7 @@ pub async fn get_access_token(
         .send()
         .await
         .expect("Failed to send code");
-    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    assert_eq!(response.status(), reqwest::StatusCode::ACCEPTED);
 
     // Extract code from email
     let sent_email = mock_emailer.last_sent_email().expect("No email sent");
