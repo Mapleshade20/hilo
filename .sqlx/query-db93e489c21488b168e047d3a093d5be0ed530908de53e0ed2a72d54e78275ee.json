@@ -1,0 +1,53 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            fm.id,\n            fm.user_a_id,\n            fm.user_b_id,\n            fm.score,\n            ua.email as user_a_email,\n            ub.email as user_b_email\n        FROM final_matches fm\n        JOIN users ua ON fm.user_a_id = ua.id\n        JOIN users ub ON fm.user_b_id = ub.id\n        ORDER BY fm.score DESC\n        LIMIT $1 OFFSET $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_a_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "user_b_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "score",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 4,
+        "name": "user_a_email",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "user_b_email",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "db93e489c21488b168e047d3a093d5be0ed530908de53e0ed2a72d54e78275ee"
+}

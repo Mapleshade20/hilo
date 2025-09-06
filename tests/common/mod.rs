@@ -115,6 +115,45 @@ pub async fn spawn_app(test_db_pool: PgPool) -> (String, Arc<MockEmailer>) {
     (address, mock_emailer)
 }
 
+/// Test structure for admin API responses
+pub struct TestApp {
+    pub address: String,
+}
+
+/// Spawns only the admin app for testing admin-specific functionality
+pub async fn spawn_admin_app(test_db_pool: PgPool) -> TestApp {
+    dotenvy::from_filename_override("tests/data/.test.env").unwrap();
+
+    // Randomly choose an available port
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("Failed to bind random port at localhost");
+    let port = listener.local_addr().unwrap().port();
+
+    tokio::spawn(async move {
+        let admin_router = hilo::handlers::admin_router(test_db_pool);
+        axum::serve(listener, admin_router).await.unwrap();
+    });
+
+    let address = format!("http://127.0.0.1:{port}");
+
+    // Wait for server to be ready (try a simple request)
+    let client = reqwest::Client::new();
+    for _ in 0..10 {
+        if client
+            .get(format!("{address}/api/admin/stats"))
+            .send()
+            .await
+            .is_ok()
+        {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+
+    TestApp { address }
+}
+
 // Helper function to extract verification code from email body
 pub fn extract_verification_code(email_body: &str) -> &str {
     // Extract 6-digit code from "Your verification code is: 123456"
