@@ -6,7 +6,10 @@ use uuid::Uuid;
 
 use crate::handlers::FormRequest;
 use crate::models::TagSystem;
-use crate::utils::{constant::*, static_object::TOTAL_TAGS};
+use crate::utils::{
+    constant::*,
+    static_object::{TAGS_LIMIT_SUM, TRAITS, TRAITS_LIMIT_EACH},
+};
 
 #[derive(Debug, Serialize, Deserialize, sqlx::Type, PartialEq, Eq, Clone, Copy)]
 #[sqlx(type_name = "gender", rename_all = "snake_case")]
@@ -48,13 +51,13 @@ impl FormRequest {
         }
 
         // Validate total tags limit
-        let total_tags = *TOTAL_TAGS;
+        let tags_limit_sum = *TAGS_LIMIT_SUM;
 
         let user_total_tags = self.familiar_tags.len() + self.aspirational_tags.len();
-        if user_total_tags > total_tags {
+        if user_total_tags > tags_limit_sum {
             warn!(
                 "User submitted {} tags, exceeding limit of {}",
-                user_total_tags, total_tags
+                user_total_tags, tags_limit_sum
             );
             return Err("Total tags exceed limit");
         }
@@ -101,7 +104,50 @@ impl FormRequest {
             return Err("self_intro too long");
         }
 
-        // TODO: validate self_traits and ideal_traits tags exist (preread traits.json into a vec in static_object) and each field must contain no more than TOTAL_TRAITS (see .env) tags
+        // Validate self_traits and ideal_traits tags exist and limits
+        let traits_limit = *TRAITS_LIMIT_EACH;
+
+        if self.self_traits.len() > traits_limit {
+            warn!(
+                "self_traits count {} exceeds limit of {}",
+                self.self_traits.len(),
+                traits_limit
+            );
+            return Err("Too many self traits");
+        }
+
+        if self.ideal_traits.len() > traits_limit {
+            warn!(
+                "ideal_traits count {} exceeds limit of {}",
+                self.ideal_traits.len(),
+                traits_limit
+            );
+            return Err("Too many ideal traits");
+        }
+
+        let mut self_traits_set = HashSet::new();
+        for trait_id in &self.self_traits {
+            if !TRAITS.contains(trait_id) {
+                warn!("Invalid self trait: {}", trait_id);
+                return Err("Invalid self trait");
+            }
+            if !self_traits_set.insert(trait_id) {
+                warn!("Duplicate trait found in self_traits: {}", trait_id);
+                return Err("Duplicate self trait not allowed");
+            }
+        }
+
+        let mut ideal_traits_set = HashSet::new();
+        for trait_id in &self.ideal_traits {
+            if !TRAITS.contains(trait_id) {
+                warn!("Invalid ideal trait: {}", trait_id);
+                return Err("Invalid ideal trait");
+            }
+            if !ideal_traits_set.insert(trait_id) {
+                warn!("Duplicate trait found in ideal_traits: {}", trait_id);
+                return Err("Duplicate ideal trait not allowed");
+            }
+        }
 
         // Validate physical_boundary is between 1 and 4
         if !(1..=4).contains(&self.physical_boundary) {

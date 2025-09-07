@@ -422,10 +422,10 @@ _Admin endpoints run on separate port (configured via `ADMIN_ADDRESS`)_
 
 TODO!
 
-### Run on host machine
-
 <details>
 <summary>Run on host machine</summary>
+
+### Run on host machine
 
 Configure `.env`
 

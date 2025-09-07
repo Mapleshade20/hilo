@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::env;
 use std::sync::LazyLock;
 
@@ -66,6 +67,28 @@ pub static TAG_TREE: LazyLock<Vec<TagNode>> = LazyLock::new(|| {
     })
 });
 
+pub static TRAITS: LazyLock<HashSet<String>> = LazyLock::new(|| {
+    let raw = std::fs::read_to_string("traits.json").unwrap_or_else(|_| {
+        error!("Failed to read traits.json file");
+        std::process::exit(1);
+    });
+
+    let traits: Vec<serde_json::Value> = serde_json::from_str(&raw).unwrap_or_else(|e| {
+        error!("Failed to parse traits.json: {}", e);
+        std::process::exit(1)
+    });
+
+    traits
+        .into_iter()
+        .filter_map(|trait_obj| {
+            trait_obj
+                .get("id")
+                .and_then(|id| id.as_str())
+                .map(|s| s.to_string())
+        })
+        .collect()
+});
+
 pub static TAG_SCORE_DECAY_FACTOR: LazyLock<f64> = LazyLock::new(|| {
     env::var("TAG_SCORE_DECAY_FACTOR")
         .ok()
@@ -96,13 +119,23 @@ pub static TRAIT_MATCH_POINTS: LazyLock<f64> = LazyLock::new(|| {
         })
 });
 
-pub static TOTAL_TAGS: LazyLock<usize> = LazyLock::new(|| {
-    env::var("TOTAL_TAGS")
+pub static TAGS_LIMIT_SUM: LazyLock<usize> = LazyLock::new(|| {
+    env::var("TAGS_LIMIT_SUM")
         .ok()
         .and_then(|val| val.parse::<usize>().ok())
         .unwrap_or_else(|| {
-            error!("Invalid or missing TOTAL_TAGS env var, using fallback value 10");
+            error!("Invalid or missing TAGS_LIMIT_SUM env var, using fallback value 10");
             10
+        })
+});
+
+pub static TRAITS_LIMIT_EACH: LazyLock<usize> = LazyLock::new(|| {
+    env::var("TRAITS_LIMIT_EACH")
+        .ok()
+        .and_then(|val| val.parse::<usize>().ok())
+        .unwrap_or_else(|| {
+            error!("Invalid or missing TRAITS_LIMIT_EACH env var, using fallback value 3");
+            3
         })
 });
 
