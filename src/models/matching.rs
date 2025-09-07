@@ -31,6 +31,7 @@ pub struct VetoRequest {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProfilePreview {
+    pub candidate_id: Uuid,
     pub familiar_tags: Vec<String>,
     pub aspirational_tags: Vec<String>,
     pub recent_topics: String,

@@ -46,6 +46,7 @@ pub struct PaginationQuery {
     pub page: u32,
     #[serde(default = "default_limit")]
     pub limit: u32,
+    pub status: Option<UserStatus>,
 }
 fn default_page() -> u32 {
     1
@@ -80,11 +81,18 @@ pub struct PaginationInfo {
 
 /// Gets a paginated overview of all users in the system.
 ///
-/// GET /api/admin/users ?page=1&limit=20
+/// GET /api/admin/users ?page=1&limit=20&status=verification_pending
 ///
-/// This endpoint returns a paginated list of all users with basic information
+/// This endpoint returns a paginated list of users with basic information
 /// (ID, email, status). Results are ordered by creation date (newest first).
 /// Supports pagination with configurable page size (1-100 items per page).
+/// Optionally filters users by status when the status query parameter is provided.
+///
+/// # Query Parameters
+///
+/// - `page`: Page number (default: 1)
+/// - `limit`: Items per page (default: 20, max: 100)
+/// - `status`: Optional status filter (e.g., "verification_pending")
 ///
 /// # Returns
 ///
@@ -101,25 +109,53 @@ pub async fn get_users_overview(
     let offset = (page - 1) * limit;
 
     // Get total count
-    let total = sqlx::query_scalar!("SELECT COUNT(*) FROM users")
+    let total = if let Some(status) = &pagination.status {
+        sqlx::query_scalar!(
+            "SELECT COUNT(*) FROM users WHERE status = $1",
+            *status as UserStatus
+        )
         .fetch_one(&state.db_pool)
         .await?
-        .unwrap_or(0) as u32;
+        .unwrap_or(0) as u32
+    } else {
+        sqlx::query_scalar!("SELECT COUNT(*) FROM users")
+            .fetch_one(&state.db_pool)
+            .await?
+            .unwrap_or(0) as u32
+    };
 
     // Get users with pagination
-    let users = sqlx::query_as!(
-        UserOverview,
-        r#"
-        SELECT id, email, status as "status: UserStatus"
-        FROM users
-        ORDER BY created_at DESC
-        LIMIT $1 OFFSET $2
-        "#,
-        limit as i64,
-        offset as i64
-    )
-    .fetch_all(&state.db_pool)
-    .await?;
+    let users = if let Some(status) = &pagination.status {
+        sqlx::query_as!(
+            UserOverview,
+            r#"
+            SELECT id, email, status as "status: UserStatus"
+            FROM users
+            WHERE status = $1
+            ORDER BY created_at DESC
+            LIMIT $2 OFFSET $3
+            "#,
+            *status as UserStatus,
+            limit as i64,
+            offset as i64
+        )
+        .fetch_all(&state.db_pool)
+        .await?
+    } else {
+        sqlx::query_as!(
+            UserOverview,
+            r#"
+            SELECT id, email, status as "status: UserStatus"
+            FROM users
+            ORDER BY created_at DESC
+            LIMIT $1 OFFSET $2
+            "#,
+            limit as i64,
+            offset as i64
+        )
+        .fetch_all(&state.db_pool)
+        .await?
+    };
 
     let total_pages = total.div_ceil(limit); // Ceiling division
     let response = PaginatedResponse {

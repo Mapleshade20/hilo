@@ -2,8 +2,7 @@
 CREATE TYPE gender AS ENUM ('male', 'female');
 
 CREATE TABLE forms (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     -- Section A
     gender gender NOT NULL,
     -- wechat_id goes here in frontend but is stored in users table

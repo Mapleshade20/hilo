@@ -1,17 +1,17 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT email, status as \"status: UserStatus\" FROM users WHERE id = $1",
+  "query": "SELECT COUNT(*) FROM users WHERE status = $1",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "email",
-        "type_info": "Varchar"
-      },
-      {
-        "ordinal": 1,
-        "name": "status: UserStatus",
-        "type_info": {
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        {
           "Custom": {
             "name": "user_status",
             "kind": {
@@ -26,17 +26,11 @@
             }
           }
         }
-      }
-    ],
-    "parameters": {
-      "Left": [
-        "Uuid"
       ]
     },
     "nullable": [
-      false,
-      false
+      null
     ]
   },
-  "hash": "5580f8f572fd93f4641c87de41f9938ccc15b40a29a4e3b9c876d077e16c53cb"
+  "hash": "9e0cb87a47445f958b698c1b427f7e0563078fc25a189e46abf5a13e91871ae8"
 }

@@ -1,2 +1,2 @@
 -- Add down migration script here
-DROP TABLE match_previews;
+DROP TABLE IF EXISTS match_previews;

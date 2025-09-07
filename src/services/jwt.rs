@@ -189,11 +189,11 @@ impl JwtService {
                 Ok(token_data.claims)
             }
             Err(e) if e.kind() == &jsonwebtoken::errors::ErrorKind::ExpiredSignature => {
-                warn!("Access token expired");
+                debug!("Access token expired");
                 Err(JwtError::TokenExpired)
             }
             Err(e) => {
-                warn!(error = %e, "Invalid access token");
+                debug!(error = %e, "Invalid access token");
                 Err(JwtError::InvalidToken)
             }
         }
@@ -249,7 +249,7 @@ impl JwtService {
                 record
             }
             None => {
-                warn!("Refresh token not found or expired");
+                debug!("Refresh token not found or expired");
                 return Err(JwtError::RefreshTokenNotFound);
             }
         };

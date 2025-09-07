@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use sqlx::PgPool;
-use tracing::{error, info, trace};
+use tracing::{debug, error, info, trace};
 use uuid::Uuid;
 
 use crate::error::AppResult;
@@ -242,7 +242,7 @@ impl MatchingService {
         db_pool: &PgPool,
         tag_system: &TagSystem,
     ) -> AppResult<()> {
-        info!("Starting match preview generation");
+        debug!("Starting match preview generation");
 
         let forms = Self::fetch_unmatched_forms(db_pool).await?;
         if forms.is_empty() {

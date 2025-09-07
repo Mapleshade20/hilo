@@ -101,7 +101,7 @@ impl FormRequest {
             return Err("self_intro too long");
         }
 
-        // TODO: validate self_traits and ideal_traits tags exist (see traits.json) and each field must contain no more than TOTAL_TRAITS (see .env) tags
+        // TODO: validate self_traits and ideal_traits tags exist (preread traits.json into a vec in static_object) and each field must contain no more than TOTAL_TRAITS (see .env) tags
 
         // Validate physical_boundary is between 1 and 4
         if !(1..=4).contains(&self.physical_boundary) {

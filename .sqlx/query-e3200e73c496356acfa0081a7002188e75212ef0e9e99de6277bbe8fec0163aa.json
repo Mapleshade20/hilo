@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT id, email, status as \"status: UserStatus\"\n        FROM users\n        ORDER BY created_at DESC\n        LIMIT $1 OFFSET $2\n        ",
+  "query": "\n            SELECT id, email, status as \"status: UserStatus\"\n            FROM users\n            ORDER BY created_at DESC\n            LIMIT $1 OFFSET $2\n            ",
   "describe": {
     "columns": [
       {
@@ -45,5 +45,5 @@
       false
     ]
   },
-  "hash": "c36191e04f3d0d76dcc6561a40f25155a6e73f34eb9790ff25a5da17ddd3f7d6"
+  "hash": "e3200e73c496356acfa0081a7002188e75212ef0e9e99de6277bbe8fec0163aa"
 }

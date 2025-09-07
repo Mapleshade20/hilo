@@ -29,7 +29,7 @@ use super::{
     get_user_id_by_email, get_user_status, is_vetoed,
 };
 use crate::error::{AppError, AppResult};
-use crate::models::{FinalMatch, TagSystem, UserStatus};
+use crate::models::{TagSystem, UserStatus};
 use crate::services::matching::MatchingService;
 
 #[derive(Debug, Serialize)]
@@ -37,7 +37,6 @@ pub struct TriggerMatchingResponse {
     pub success: bool,
     pub message: &'static str,
     pub matches_created: usize,
-    pub matches: Vec<FinalMatch>,
 }
 
 #[derive(Debug, Serialize)]
@@ -63,35 +62,33 @@ pub struct ActionResponse {
 pub async fn trigger_final_matching(
     State(state): State<Arc<AdminState>>,
 ) -> AppResult<impl IntoResponse> {
-    let matches = execute_final_matching(&state.db_pool, state.tag_system)
+    let matches_len = execute_final_matching(&state.db_pool, state.tag_system)
         .await
         .map_err(|e| {
             error!("Final matching failed: {}", e);
             AppError::Internal
         })?;
 
-    info!("Final matching completed: {} pairs", matches.len());
+    info!("Final matching completed: {} pairs", matches_len);
     Ok((
         StatusCode::OK,
         Json(TriggerMatchingResponse {
             success: true,
             message: "Final matching completed successfully",
-            matches_created: matches.len(),
-            matches,
+            matches_created: matches_len,
         }),
     )
         .into_response())
 }
 
 /// Execute the final matching algorithm using greedy approach
-async fn execute_final_matching(
-    db_pool: &PgPool,
-    tag_system: &TagSystem,
-) -> AppResult<Vec<FinalMatch>> {
+///
+/// Ok value is the number of matches created
+async fn execute_final_matching(db_pool: &PgPool, tag_system: &TagSystem) -> AppResult<usize> {
     // Fetch all users with submitted forms
     let forms = MatchingService::fetch_unmatched_forms(db_pool).await?;
     if forms.is_empty() {
-        return Ok(vec![]);
+        return Ok(0);
     }
 
     // Fetch all veto records
@@ -133,6 +130,7 @@ async fn execute_final_matching(
     }
 
     // Sort by score (descending) for greedy algorithm
+    // TODO: consider using better algorithm like Hungarian for optimal matching
     pair_scores.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
 
     // Greedy matching algorithm
@@ -174,7 +172,7 @@ async fn execute_final_matching(
         .execute(db_pool)
         .await?;
 
-    Ok(final_matches)
+    Ok(final_matches.len())
 }
 
 /// Manually regenerates match previews for all eligible users.
@@ -220,14 +218,6 @@ pub struct VerifyUserRequest {
     pub email: Option<String>,
     /// Target verification status (verified or unverified)
     pub status: UserStatus,
-}
-
-/// Response for admin user verification
-#[derive(Debug, Serialize)]
-pub struct VerifyUserResponse {
-    pub success: bool,
-    pub message: &'static str,
-    pub user: UserData,
 }
 
 /// User data structure for verification response
@@ -310,16 +300,12 @@ pub async fn verify_user(
 
     Ok((
         StatusCode::OK,
-        Json(VerifyUserResponse {
-            success: true,
-            message: "User status updated successfully",
-            user: UserData {
-                user_id: updated_user.id,
-                email: updated_user.email,
-                status: updated_user.status,
-                grade: updated_user.grade,
-                card_photo_filename: updated_user.card_photo_filename,
-            },
+        Json(UserData {
+            user_id: updated_user.id,
+            email: updated_user.email,
+            status: updated_user.status,
+            grade: updated_user.grade,
+            card_photo_filename: updated_user.card_photo_filename,
         }),
     )
         .into_response())

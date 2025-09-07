@@ -7,11 +7,12 @@ use std::sync::Arc;
 
 use axum::{
     extract::{Extension, State},
-    http::StatusCode,
+    response::IntoResponse,
 };
 use tracing::{info, instrument, warn};
 
 use crate::error::{AppError, AppResult};
+use crate::handlers::get_profile;
 use crate::middleware::AuthUser;
 use crate::models::{AppState, UserStatus};
 
@@ -21,11 +22,11 @@ use crate::models::{AppState, UserStatus};
 ///
 /// Updates the user's status from 'matched' to 'confirmed', indicating
 /// acceptance of their final match partner. If both users accept their
-/// match, the pairing process is complete.
+/// match, the pairing process is complete. Returns the updated profile.
 ///
 /// # Returns
 ///
-/// - `200 OK` - Final match accepted successfully
+/// - `200 OK` with `ProfileResponse`- Final match accepted successfully
 /// - `400 Bad Request` - User is not in 'matched' status
 /// - `401 Unauthorized` - Missing or invalid authentication token
 /// - `500 Internal Server Error` - Database error
@@ -39,7 +40,7 @@ use crate::models::{AppState, UserStatus};
 pub async fn accept_final_match(
     State(state): State<Arc<AppState>>,
     Extension(user): Extension<AuthUser>,
-) -> AppResult<StatusCode> {
+) -> AppResult<impl IntoResponse> {
     // Check user status - must be 'matched'
     let user_status = UserStatus::query(&state.db_pool, &user.user_id).await?;
 
@@ -56,8 +57,9 @@ pub async fn accept_final_match(
     .execute(&state.db_pool)
     .await?;
 
-    info!("User successfully accepted final match");
-    Ok(StatusCode::OK)
+    info!("User accepted final match");
+
+    get_profile(State(state), Extension(user)).await
 }
 
 /// Rejects a final match result, reverting both users to 'form_completed' status.
@@ -66,7 +68,8 @@ pub async fn accept_final_match(
 ///
 /// Reverts both the user and their partner to 'form_completed' status
 /// and removes the final match record from the database. This allows both
-/// users to potentially be matched again in future matching rounds.
+/// users to potentially be matched again in future matching rounds. Returns
+/// the updated profile.
 ///
 /// # Returns
 ///
@@ -84,7 +87,7 @@ pub async fn accept_final_match(
 pub async fn reject_final_match(
     State(state): State<Arc<AppState>>,
     Extension(user): Extension<AuthUser>,
-) -> AppResult<StatusCode> {
+) -> AppResult<impl IntoResponse> {
     // Check user status - must be 'matched'
     let user_status = UserStatus::query(&state.db_pool, &user.user_id).await?;
 
@@ -140,6 +143,6 @@ pub async fn reject_final_match(
 
     tx.commit().await?;
 
-    info!(%partner_id, "User successfully rejected final match");
-    Ok(StatusCode::OK)
+    info!(%partner_id, "User rejected final match");
+    get_profile(State(state), Extension(user)).await
 }

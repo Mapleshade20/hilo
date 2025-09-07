@@ -265,6 +265,7 @@ async fn fetch_profile_previews(
     let result = sqlx::query!(
         r#"
         SELECT
+            f.user_id,
             f.familiar_tags,
             f.aspirational_tags,
             f.recent_topics,
@@ -285,6 +286,7 @@ async fn fetch_profile_previews(
         .map(|row| {
             let email_domain = row.email.split('@').nth(1).unwrap_or("").to_string();
             ProfilePreview {
+                candidate_id: row.user_id,
                 familiar_tags: row.familiar_tags,
                 aspirational_tags: row.aspirational_tags,
                 recent_topics: row.recent_topics,

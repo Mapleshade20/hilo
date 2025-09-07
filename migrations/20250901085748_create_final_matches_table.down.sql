@@ -1,2 +1,4 @@
 -- Add down migration script here
-DROP TABLE final_matches;
+DROP INDEX IF EXISTS idx_final_matches_user_a;
+DROP INDEX IF EXISTS idx_final_matches_user_b;
+DROP TABLE IF EXISTS final_matches;

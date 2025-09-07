@@ -10,3 +10,5 @@ CREATE TABLE vetoes (
     UNIQUE(vetoer_id, vetoed_id),
     CHECK(vetoer_id != vetoed_id)
 );
+
+CREATE INDEX idx_vetoes_vetoer_id ON vetoes(vetoer_id);
