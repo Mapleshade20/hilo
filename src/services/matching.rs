@@ -8,7 +8,7 @@ use uuid::Uuid;
 use crate::error::AppResult;
 use crate::models::{Form, Gender, TagSystem};
 use crate::utils::{
-    constant::MAX_PREVIEW_CANDIDATES,
+    constant::{IDF_MIN, INCOMPATIBLE_MATCH_SCORE, MAX_PREVIEW_CANDIDATES},
     static_object::{
         COMPLEMENTARY_TAG_WEIGHT, MATCH_PREVIEW_INTERVAL_MINUTES, TAG_SCORE_DECAY_FACTOR,
         TRAIT_MATCH_POINTS,
@@ -19,7 +19,7 @@ pub struct MatchingService;
 
 impl MatchingService {
     /// Calculates the compatibility score between two users
-    /// Returns -1.0 for impossible matches, positive scores for viable matches
+    /// Returns INCOMPATIBLE_MATCH_SCORE for impossible matches, positive scores for viable matches
     pub fn calculate_match_score(
         form_a: &Form,
         form_b: &Form,
@@ -31,7 +31,7 @@ impl MatchingService {
 
         // Gender Filter: Must be one male and one female
         if !Self::is_gender_compatible(form_a.gender, form_b.gender) {
-            return -1.0;
+            return INCOMPATIBLE_MATCH_SCORE;
         }
 
         // Physical Boundary Filter: Difference must be <= 1
@@ -42,7 +42,7 @@ impl MatchingService {
                 "Physical boundary incompatible: {} and {}",
                 form_a.physical_boundary, form_b.physical_boundary
             );
-            return -1.0;
+            return INCOMPATIBLE_MATCH_SCORE;
         }
 
         // 1.2 Scored Components (Points-based)
@@ -208,7 +208,7 @@ impl MatchingService {
         let idf = (total_user_count as f64 / frequency as f64).log2();
 
         // Ensure we don't get negative or zero scores
-        idf.max(0.1)
+        idf.max(IDF_MIN)
     }
 
     /// Calculate trait compatibility score between two users

@@ -155,7 +155,7 @@ impl FormRequest {
                 "Invalid physical_boundary value: {}",
                 self.physical_boundary
             );
-            return Err("physical_boundary must be between 1 and 3");
+            return Err("physical_boundary must be between 1 and 4");
         }
 
         Ok(())

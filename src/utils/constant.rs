@@ -27,3 +27,9 @@ pub const MAX_WECHAT_ID_LENGTH: usize = 100;
 
 /// Maximum number of match preview candidates to store per user
 pub const MAX_PREVIEW_CANDIDATES: usize = 8;
+
+/// Score assigned to incompatible matches
+pub const INCOMPATIBLE_MATCH_SCORE: f64 = -1.0;
+
+/// Minimum IDF value to avoid division by zero or overly aggressive down-weighting
+pub const IDF_MIN: f64 = 0.1;
