@@ -1,4 +1,4 @@
-# Hilo: Social Pairing Backend for Project Encontrar
+# Hilo: Social Pairing Event Backend - Project Encontrar
 
 [![Dev CI](https://github.com/Mapleshade20/hilo/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/Mapleshade20/hilo/actions)
 [![Release](https://img.shields.io/github/v/release/Mapleshade20/hilo?logo=rocket)](https://github.com/Mapleshade20/hilo/releases)
@@ -420,65 +420,93 @@ _Admin endpoints run on separate port (configured via `ADMIN_ADDRESS`)_
 
 ### Run in container (recommended)
 
-TODO!
+1. **Set up prerequisites**
+   - Podman setup in rootless mode, Podman Compose
+   - Obtain valid send API key from [Mailgun](https://mailgun.com)
 
-<details>
-<summary>Run on host machine</summary>
+2. **Prepare secrets**: Start somewhere safe and permanent like `~/.config`
+
+```bash
+$ umask 077
+$ mkdir secrets_hilo && cd secrets_hilo
+
+$ openssl rand -base64 32 > ./jwt_secret.txt
+
+# Then write your mailgun api key and database password into files, for example
+$ nvim ./mailgun_api_key.txt
+$ nvim ./db_password.txt
+
+$ podman secret create hilo_jwt_secret ./jwt_secret.txt
+$ podman secret create hilo_mailgun_api_key ./mailgun_api_key.txt
+$ podman secret create hilo_db_password ./db_password.txt
+```
+
+3. **Compose and run in background**
+
+```bash
+$ curl -o production.yml https://raw.githubusercontent.com/Mapleshade20/hilo/main/production.yml
+$ podman-compose -p hilo_prod -f production.yml up -d
+
+# Monitor health
+$ curl http://localhost:8090/health-check
+$ podman logs hilo_prod_app_1
+
+# To stop, run:
+$ podman-compose -p hilo_prod -f production.yml down
+```
+
+4. **Go online**: Configure a reverse proxy on port `8090` and firewall to make it publicly accessible
+5. (Optional) Refer to other documentations on how to make it a systemd service
 
 ### Run on host machine
 
-Configure `.env`
+<details>
+<summary>Details</summary>
 
-Start PostgreSQL with Podman:
+1. Configure `.env`
+2. Start PostgreSQL with Podman
 
 ```bash
-$ podman-compose up -d db
+$ podman-compose up -f <which.yml> -d db
+```
 
-$ sqlx migrate run
+3. Run with cargo
 
+```bash
 $ cargo run
 ```
 
 </details>
 
-## Production Deployment
+## Additional Notes
 
 ### Email Service
 
 The email service supports multiple providers:
 
-- **Log Provider** (`EMAIL_PROVIDER="log"`): Logs emails to console (development)
+- **Log Provider** (`EMAIL_PROVIDER="log"`): Logs emails to console (for development)
 - **External Provider** (`EMAIL_PROVIDER="external"`): HTTP API with Basic Auth
-  - Currently supports Mailgun-style API (username: "api")
-  - Configure `MAIL_API_URL` and `MAIL_API_KEY`
+  - Currently supports Mailgun-style API (username: "api", password: api-key)
+  - Configure `SENDER_EMAIL`, `MAIL_API_URL` and `MAIL_API_KEY`(`MAIL_API_KEY_FILE`)
 
-### Security Considerations
+### Deployment Security Considerations
 
-- **Rate Limiting**: The verification code API has per-email rate limiting, but production deployments should implement IP-based rate limiting for all endpoints
+- **Rate Limiting**: The verification code API has a built-in per-email rate limiting, but production deployments should implement IP-based rate limiting and ddos protection for all endpoints
 - **System Time**: Ensure accurate system time for JWT token expiration
-- **Database Security**: Use strong passwords and restrict database access
-- **File Storage**: Configure secure file permissions for upload directories
+- **Database Security**: Use strong passwords
 - **HTTPS**: Always use HTTPS in production with proper SSL certificates
+- **Admin API**: **Do not expose admin endpoints to public network.** Instead, use Cloudflare Access or similar gateways to secure it.
 
-### Environment Variables for Production
+### Environment Variables in Production
 
-See `.env`
+Configure environment variables in `podman-compose.yml`. For their meanings refer to `.env`
 
-## Admin Operations
-
-### User Management Workflow
+### User Management Workflow for Admin
 
 1. **ID Card Verification**: Review uploaded ID cards via admin interface
 2. **Status Updates**: Change user status from `verification_pending` to `verified`
 3. **Match Generation**: Trigger final matching when ready
 4. **System Monitoring**: Monitor user statistics and system health
-
-### Matching Process
-
-1. **Preview Generation**: Run `POST /api/admin/update-previews` periodically
-2. **User Review Period**: Allow users to review and veto potential matches
-3. **Final Matching**: Trigger `POST /api/admin/trigger-match` when ready
-4. **Result Monitoring**: Check match quality via `GET /api/admin/matches`
 
 ## Development
 
@@ -494,6 +522,13 @@ $ pre-commit install --hook-type pre-commit
 # Run all checks
 $ pre-commit run --all-files
 ```
+
+SQLx queries should be written to `.sqlx` for offline build
+
+- **Migrations**: `sqlx migrate run` (via sqlx-cli)
+- **SQLx offline prepare**: `cargo sqlx prepare -- --all-targets`
+- **Start postgres**: `podman-compose -f podman-compose.dev.yml up --detach db`
+- **Reset postgres**: `podman-compose -f podman-compose.dev.yml down -v`
 
 ### Testing
 

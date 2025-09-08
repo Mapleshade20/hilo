@@ -4,13 +4,6 @@ version = "0.1.0"
 edition = "2024"
 authors = ["Maple <mapleshade20@gmail.com>"]
 
-[lib]
-path = "src/lib.rs"
-
-[[bin]]
-path = "src/main.rs"
-name = "hilo"
-
 [dependencies]
 async-trait = "0.1"
 axum = { version = "0.8", features = ["multipart"] }

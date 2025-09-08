@@ -30,8 +30,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Test single**: `cargo test --test test_name`
 - **Migrations**: `sqlx migrate run`
 - **SQLx offline prepare**: `cargo sqlx prepare -- --all-targets`
-- **Start postgres**: `podman-compose up -d db`
-- **Reset postgres**: `podman-compose down -v`
+- **Start postgres**: `podman-compose -f podman-compose.dev.yml up --detach db`
+- **Reset postgres**: `podman-compose -f podman-compose.dev.yml down -v`
 
 ## Environment Configuration
 

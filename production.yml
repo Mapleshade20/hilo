@@ -1,0 +1,86 @@
+# For production deployment
+# use `podman compose -p hilo_prod -f production.yml up -d`
+version: "3.8"
+
+services:
+  db:
+    image: postgres:17-trixie
+    restart: always
+    environment:
+      - POSTGRES_USER=hilo_user
+      - POSTGRES_PASSWORD_FILE=/run/secrets/hilo_db_password
+      - POSTGRES_DB=hilo_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hilo_user -d hilo_db"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+      start_interval: 5s
+    secrets:
+      - hilo_db_password
+
+  app:
+    image: ghcr.io/Mapleshade20/hilo:latest
+    ports:
+      - "8090:8090"
+      - "8091:8091"
+    environment:
+      # Non-sensitive configuration variables
+      ALLOWED_DOMAINS: "mails.tsinghua.edu.cn:stu.pku.edu.cn"
+      ALLOWED_GRADES: "undergraduate:graduate"
+      EMAIL_PROVIDER: "external"
+      MAIL_API_URL: "https://api.mailgun.net/v3/mail.maplewrt.com/messages"
+      SENDER_EMAIL: "Project Encontrar <no-reply@mail.maplewrt.com>"
+      DATABASE_URL: "postgres://hilo_user:hilo_pass@db:5432/hilo_db" # Updated via entrypoint
+      RUST_LOG: "info"
+      NO_COLOR: 1
+      LOG_FORMAT: "plain"
+      ADDRESS: "0.0.0.0:8090"
+      ADMIN_ADDRESS: "0.0.0.0:8091"
+      UPLOAD_DIR: "/home/appuser/uploads"
+      TAGS_LIMIT_SUM: 10
+      TRAITS_LIMIT_EACH: 3
+      MATCH_PREVIEW_INTERVAL_MINUTES: 20
+      TAG_SCORE_DECAY_FACTOR: 0.5
+      COMPLEMENTARY_TAG_WEIGHT: 0.8
+      TRAIT_MATCH_POINTS: 2.0
+
+      # Location to the secrets
+      JWT_SECRET_FILE: "/run/secrets/hilo_jwt_secret"
+      MAIL_API_KEY_FILE: "/run/secrets/hilo_mailgun_api_key"
+      DB_PASSWORD_FILE: "/run/secrets/hilo_db_password"
+
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - app_uploads:/home/appuser/uploads
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8090/health-check"]
+      interval: 1m
+      timeout: 5s
+      start_period: 3s
+      start_interval: 1s
+    working_dir: /home/appuser
+    secrets:
+      - hilo_jwt_secret
+      - hilo_mailgun_api_key
+      - hilo_db_password
+
+secrets:
+  hilo_jwt_secret:
+    # Indicates this secret is managed externally (via 'podman secret create')
+    external: true
+  hilo_mailgun_api_key:
+    external: true
+  hilo_db_password:
+    external: true
+
+volumes:
+  postgres_data:
+  app_uploads:
