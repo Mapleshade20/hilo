@@ -25,7 +25,7 @@ services:
       - hilo_db_password
 
   app:
-    image: ghcr.io/Mapleshade20/hilo:latest
+    image: ghcr.io/mapleshade20/hilo:latest
     ports:
       - "8090:8090"
       - "8091:8091"
