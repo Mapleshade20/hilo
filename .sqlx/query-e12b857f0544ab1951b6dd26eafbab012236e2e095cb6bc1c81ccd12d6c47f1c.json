@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO final_matches (user_a_id, user_b_id, score) VALUES ($1, $2, 0.85)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e12b857f0544ab1951b6dd26eafbab012236e2e095cb6bc1c81ccd12d6c47f1c"
+}

@@ -120,7 +120,11 @@ pub async fn send_verification_code(
     // Send email
     state
         .email_service
-        .send_email(&payload.email, "Verification code", &code)
+        .send_email(
+            &payload.email,
+            "Your login code to Project Encontrar",
+            &code,
+        )
         .await
         .map_err(|e| {
             error!(error = %e, "Failed to send verification code");

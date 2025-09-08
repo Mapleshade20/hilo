@@ -18,18 +18,28 @@ async function handleEmailRequest(request: Request): Promise<Response> {
   }
 
   try {
-    const emailData: VerificationEmail = await request.json();
+    const formData = await request.formData();
+    const emailData: VerificationEmail = {
+      to: formData.get("to") as string,
+      from: formData.get("from") as string,
+      subject: formData.get("subject") as string,
+      text: formData.get("html") as string,
+    };
+
     console.log(`📧 Received email for: ${emailData.to}`);
 
-    if (emailData.content && emailData.content.length > 0) {
-      const htmlContent = emailData.content[0].value;
-      const code = extractVerificationCode(htmlContent);
+    if (emailData.text) {
+      const code = extractVerificationCode(emailData.text);
 
       if (code) {
         verificationCodes.set(emailData.to, code);
-        console.log(`🔑 Extracted verification code for ${emailData.to}: ${code}`);
+        console.log(
+          `🔑 Extracted verification code for ${emailData.to}: ${code}`,
+        );
       } else {
-        console.log(`❌ Could not extract verification code from email to ${emailData.to}`);
+        console.log(
+          `❌ Could not extract verification code from email to ${emailData.to}`,
+        );
       }
     }
 
@@ -69,7 +79,10 @@ export function clearVerificationCodes(): void {
 }
 
 // Wait for verification code to arrive
-export async function waitForVerificationCode(email: string, timeoutMs = 5000): Promise<string> {
+export async function waitForVerificationCode(
+  email: string,
+  timeoutMs = 5000,
+): Promise<string> {
   const startTime = Date.now();
 
   while (Date.now() - startTime < timeoutMs) {
@@ -77,7 +90,7 @@ export async function waitForVerificationCode(email: string, timeoutMs = 5000): 
     if (code) {
       return code;
     }
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
   }
 
   throw new Error(`Timeout waiting for verification code for ${email}`);

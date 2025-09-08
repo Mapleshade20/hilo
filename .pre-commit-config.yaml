@@ -30,7 +30,7 @@ repos:
       - id: sqlx-prepare
         name: Prepare SQLx
         description: Ensures sqlx offline data is up-to-date
-        entry: cargo sqlx prepare --check --workspace
+        entry: cargo sqlx prepare --check -- --all-targets
         language: system
         pass_filenames: false
         always_run: true

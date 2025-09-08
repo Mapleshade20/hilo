@@ -10,7 +10,6 @@
 //! - [`ExternalEmailer`] - Production implementation using external email API
 
 use async_trait::async_trait;
-use serde_json::json;
 use thiserror::Error;
 use tracing::{debug, error, info, instrument};
 
@@ -136,21 +135,17 @@ impl EmailService for ExternalEmailer {
         subject: &str,
         code: &str,
     ) -> Result<(), EmailError> {
-        debug!("Preparing to send email via external API");
-
-        let payload = json!({
-            "to": recipient,
-            "from": self.sender_email,
-            "subject": subject,
-            "content": [{ "type": "text/html", "value": generate_verification_email_html(code) }]
-        });
-
         debug!("Sending HTTP request to email API");
         let response = self
             .http_client
             .post(&self.api_url)
             .basic_auth("api", Some(&self.api_key))
-            .json(&payload)
+            .form(&[
+                ("from", self.sender_email.as_str()),
+                ("to", recipient),
+                ("subject", subject),
+                ("html", generate_verification_email_html(code).as_str()),
+            ])
             .send()
             .await;
 

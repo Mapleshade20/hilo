@@ -35,7 +35,7 @@ use crate::models::AppState;
 use crate::services::email::{EmailService, ExternalEmailer, LogEmailer};
 use crate::services::jwt::JwtService;
 use crate::services::matching::MatchingService;
-use crate::utils::{constant::*, static_object::TAG_SYSTEM};
+use crate::utils::{constant::*, secret, static_object::TAG_SYSTEM};
 
 /// Creates an Axum router with default email service configuration.
 ///
@@ -43,7 +43,7 @@ use crate::utils::{constant::*, static_object::TAG_SYSTEM};
 ///
 /// - `EMAIL_PROVIDER` - "external" uses ExternalEmailer, "log" uses LogEmailer (default)
 /// - `MAIL_API_URL`   - Required in production for external email service
-/// - `MAIL_API_KEY`   - Required in production for external email service
+/// - `MAIL_API_KEY` or `MAIL_API_KEY_FILE` (preferred)  - Required for external email service
 /// - `SENDER_EMAIL`   - Required in production for external email service
 pub fn app(db_pool: PgPool) -> Router {
     let email_service: Arc<dyn EmailService> = match env::var("EMAIL_PROVIDER")
@@ -54,8 +54,8 @@ pub fn app(db_pool: PgPool) -> Router {
             info!("Email provider set to [ExternalEmailer]");
             let api_url =
                 env::var("MAIL_API_URL").expect("Env variable `MAIL_API_URL` should be set");
-            let api_key =
-                env::var("MAIL_API_KEY").expect("Env variable `MAIL_API_KEY` should be set");
+            let api_key = secret::get_secret("MAIL_API_KEY_FILE", "MAIL_API_KEY")
+                .expect("Either `MAIL_API_KEY_FILE` or `MAIL_API_KEY` env variable should be set");
             let sender =
                 env::var("SENDER_EMAIL").expect("Env variable `SENDER_EMAIL` should be set");
             Arc::new(ExternalEmailer::new(api_url, api_key, sender))
@@ -78,17 +78,18 @@ pub fn app(db_pool: PgPool) -> Router {
 ///
 /// # Environment Variables
 ///
-/// - `JWT_SECRET` - Required for JWT token signing and validation
+/// - `JWT_SECRET` or `JWT_SECRET_FILE` (preferred) - For token signing and validation
 ///
 /// # Returns
 ///
 /// A configured Axum router with all application routes and middleware
 pub fn app_with_email_service(db_pool: PgPool, email_service: Arc<dyn EmailService>) -> Router {
     let jwt_service = {
-        let secret = env::var("JWT_SECRET").expect("Env variable `JWT_SECRET` should be set");
+        let jwt_secret = secret::get_secret("JWT_SECRET_FILE", "JWT_SECRET")
+            .expect("Either `JWT_SECRET_FILE` or `JWT_SECRET` env variable should be set");
         JwtService::new(
-            EncodingKey::from_secret(secret.as_bytes()),
-            DecodingKey::from_secret(secret.as_bytes()),
+            EncodingKey::from_secret(jwt_secret.as_bytes()),
+            DecodingKey::from_secret(jwt_secret.as_bytes()),
             db_pool.clone(),
         )
     };

@@ -18,6 +18,7 @@ use hilo::{
 };
 use sqlx::PgPool;
 use tokio::net::TcpListener;
+use tokio::signal;
 use tokio_util::sync::CancellationToken;
 use tracing::{info, instrument, warn};
 use tracing_subscriber::layer::SubscriberExt;
@@ -31,12 +32,16 @@ async fn main() {
     // 1. Set up tracing subscriber for logging
     init_tracing();
 
-    // 2. Connect to PostgreSQL database
+    // 2. Connect to PostgreSQL database and run migrations
     let db_pool = PgPool::connect(
         &env::var("DATABASE_URL").expect("Env variable `DATABASE_URL` should be set"),
     )
     .await
     .expect("Failed to connect to Postgres");
+    sqlx::migrate!("./migrations")
+        .run(&db_pool)
+        .await
+        .expect("Failed to run database migrations");
 
     info!("Connected to PostgreSQL database");
 
@@ -45,9 +50,27 @@ async fn main() {
     let main_shutdown = shutdown_token.child_token();
     let admin_shutdown = shutdown_token.child_token();
     let shutdown_signal = async {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("Failed to listen for ctrl_c signal");
+        let ctrl_c = async {
+            signal::ctrl_c()
+                .await
+                .expect("failed to install Ctrl-C handler");
+        };
+
+        #[cfg(unix)]
+        let terminate = async {
+            signal::unix::signal(signal::unix::SignalKind::terminate())
+                .expect("failed to install signal handler")
+                .recv()
+                .await;
+        };
+
+        #[cfg(not(unix))]
+        let terminate = std::future::pending::<()>();
+
+        tokio::select! {
+            _ = ctrl_c => {},
+            _ = terminate => {},
+        }
     };
 
     // 4. Start main server
@@ -91,7 +114,7 @@ async fn main() {
             shutdown_token.cancel();
         }
         _ = shutdown_signal => {
-            info!("Ctrl-C received - initiating graceful shutdown");
+            info!("Signal received - initiating graceful shutdown");
             shutdown_token.cancel();
         }
     }

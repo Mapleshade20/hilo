@@ -53,7 +53,7 @@ export interface VerificationEmail {
   to: string;
   from: string;
   subject: string;
-  content: Array<{ type: string; value: string }>;
+  text: string;
 }
 
 export type TestMode = "random" | "config";
