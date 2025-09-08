@@ -1,0 +1,15 @@
+.claude/
+.git/
+.gitignore
+.github/
+.env
+external_tests/
+priv/
+target/
+tests/
+uploads/
+uploads_test/
+*.md
+*.yml
+*.yaml
+LICENSE

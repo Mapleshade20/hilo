@@ -1,0 +1,46 @@
+[
+  {
+    "id": "emotionally_stable",
+    "name": "情绪稳定"
+  },
+  {
+    "id": "humor",
+    "name": "幽默感"
+  },
+  {
+    "id": "curiosity",
+    "name": "好奇心爆棚"
+  },
+  {
+    "id": "independent_thought",
+    "name": "思想独立 爱思辨"
+  },
+  {
+    "id": "reliable",
+    "name": "超级靠谱"
+  },
+  {
+    "id": "empathy",
+    "name": "共情能力强"
+  },
+  {
+    "id": "discipline",
+    "name": "自律是刻在骨子里的"
+  },
+  {
+    "id": "life_ritualist",
+    "name": "生活仪式感"
+  },
+  {
+    "id": "explorer",
+    "name": "热爱探索"
+  },
+  {
+    "id": "sports_lover",
+    "name": "运动达人"
+  },
+  {
+    "id": "bookworm",
+    "name": "深度阅读爱好者"
+  }
+]

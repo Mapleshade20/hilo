@@ -1,0 +1,105 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO forms (user_id, gender, familiar_tags, aspirational_tags, recent_topics,\n                          self_traits, ideal_traits, physical_boundary, self_intro, profile_photo_filename)\n        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)\n        ON CONFLICT (user_id)\n        DO UPDATE SET\n            gender = EXCLUDED.gender,\n            familiar_tags = EXCLUDED.familiar_tags,\n            aspirational_tags = EXCLUDED.aspirational_tags,\n            recent_topics = EXCLUDED.recent_topics,\n            self_traits = EXCLUDED.self_traits,\n            ideal_traits = EXCLUDED.ideal_traits,\n            physical_boundary = EXCLUDED.physical_boundary,\n            self_intro = EXCLUDED.self_intro,\n            profile_photo_filename = EXCLUDED.profile_photo_filename\n        RETURNING user_id, gender as \"gender: Gender\", familiar_tags, aspirational_tags,\n                  recent_topics, self_traits, ideal_traits, physical_boundary,\n                  self_intro, profile_photo_filename\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "gender: Gender",
+        "type_info": {
+          "Custom": {
+            "name": "gender",
+            "kind": {
+              "Enum": [
+                "male",
+                "female"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "familiar_tags",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 3,
+        "name": "aspirational_tags",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 4,
+        "name": "recent_topics",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "self_traits",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 6,
+        "name": "ideal_traits",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 7,
+        "name": "physical_boundary",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 8,
+        "name": "self_intro",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "profile_photo_filename",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "gender",
+            "kind": {
+              "Enum": [
+                "male",
+                "female"
+              ]
+            }
+          }
+        },
+        "TextArray",
+        "TextArray",
+        "Text",
+        "TextArray",
+        "TextArray",
+        "Int2",
+        "Text",
+        "Varchar"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "8d8fe4fffd982d29776e970f2bcd39b371a56f715465cb60bbae1bbda2e93087"
+}

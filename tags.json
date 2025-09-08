@@ -1,0 +1,264 @@
+[
+  {
+    "id": "sports",
+    "name": "运动/户外活动",
+    "is_matchable": true,
+    "children": [
+      {
+        "id": "volleyball",
+        "name": "排球🏐",
+        "is_matchable": true
+      },
+      {
+        "id": "basketball",
+        "name": "篮球🏀",
+        "is_matchable": true
+      },
+      {
+        "id": "soccer",
+        "name": "足球⚽",
+        "is_matchable": true
+      },
+      {
+        "id": "badminton",
+        "name": "羽毛球🏸",
+        "is_matchable": true
+      },
+      {
+        "id": "table_tennis",
+        "name": "乒乓球🏓",
+        "is_matchable": true
+      },
+      {
+        "id": "tennis",
+        "name": "网球/壁球🎾",
+        "is_matchable": true
+      },
+      {
+        "id": "running",
+        "name": "跑步🏃‍♂️",
+        "is_matchable": true
+      },
+      {
+        "id": "wild",
+        "name": "骑行🚴/徒步🚶/登山⛰️/露营⛺/攀岩🧗",
+        "is_matchable": true
+      },
+      {
+        "id": "yoga",
+        "name": "瑜伽/其他类似健身🧘",
+        "is_matchable": true
+      },
+      {
+        "id": "martial_arts",
+        "name": "武术/搏击🥋",
+        "is_matchable": true
+      },
+      {
+        "id": "dance",
+        "name": "各类舞蹈💃",
+        "is_matchable": true
+      },
+      {
+        "id": "ice_snow_sports",
+        "name": "冰雪运动⛷️",
+        "is_matchable": true
+      },
+      {
+        "id": "water_sports",
+        "name": "游泳🏊/水上运动",
+        "is_matchable": true
+      },
+      {
+        "id": "other_sports",
+        "name": "其他（开盲盒🎁）",
+        "is_matchable": true
+      }
+    ]
+  },
+  {
+    "id": "desktop",
+    "name": "桌面活动",
+    "is_matchable": false,
+    "children": [
+      {
+        "id": "board_games",
+        "name": "桌游🐺/牌类🃏/棋类♟️",
+        "is_matchable": true
+      },
+      {
+        "id": "competitive",
+        "name": "竞技类游戏",
+        "is_matchable": true,
+        "children": [
+          {
+            "id": "pc_fps",
+            "name": "PC端FPS",
+            "desc": "Apex/PUBG/Valorant等",
+            "is_matchable": true
+          },
+          {
+            "id": "pc_moba",
+            "name": "PC端MOBA类游戏",
+            "desc": "Dota2/LOL等",
+            "is_matchable": true
+          },
+          {
+            "id": "mobile_fps",
+            "name": "移动端FPS",
+            "desc": "使命召唤手游/和平精英等",
+            "is_matchable": true
+          },
+          {
+            "id": "mobile_moba",
+            "name": "移动端MOBA类游戏",
+            "desc": "王者荣耀等",
+            "is_matchable": true
+          },
+          {
+            "id": "mobile",
+            "name": "其他各类手游",
+            "is_matchable": true
+          }
+        ]
+      },
+      {
+        "id": "survival_sandbox",
+        "name": "生存类/沙盒类/模拟经营游戏",
+        "desc": "MC/饥荒/天际线等",
+        "is_matchable": true
+      },
+      {
+        "id": "narrative_adventure",
+        "name": "单机RPG/动作冒险类游戏",
+        "desc": "巫师/艾尔登法环/2077等各路大作",
+        "is_matchable": true
+      },
+      {
+        "id": "strategy_turn_based",
+        "name": "策略类回合制游戏",
+        "desc": "文明/欧陆风云等",
+        "is_matchable": true
+      },
+      {
+        "id": "music_games",
+        "name": "音游",
+        "desc": "音游人当然知道自己玩的是音游啦xD",
+        "is_matchable": true
+      },
+      {
+        "id": "creative_games",
+        "name": "沙发联机/派对/解谜/独立游戏",
+        "desc": "大众的小众的都在这里! 双人成行, 胡闹厨房, Limbo, Undertale, Celeste, 小小梦魇...",
+        "is_matchable": true
+      }
+    ]
+  },
+  {
+    "id": "arts",
+    "name": "文艺活动",
+    "is_matchable": false,
+    "children": [
+      {
+        "id": "singing",
+        "name": "唱歌🎤",
+        "is_matchable": false,
+        "children": [
+          {
+            "id": "eu_us",
+            "name": "欧美",
+            "is_matchable": true
+          },
+          {
+            "id": "japan_korea",
+            "name": "日韩",
+            "is_matchable": true
+          },
+          {
+            "id": "china",
+            "name": "华语",
+            "is_matchable": true
+          }
+        ]
+      },
+      {
+        "id": "instruments",
+        "name": "乐器🎹🎸🎻🥁",
+        "desc": "各种乐器都行鸭，互相交流",
+        "is_matchable": true
+      },
+      {
+        "id": "drawing_photo",
+        "name": "创作类活动(绘画🖊/摄影📸/写作✍️等)",
+        "is_matchable": true
+      },
+      {
+        "id": "crafts",
+        "name": "手工/DIY🧵",
+        "is_matchable": true
+      },
+      {
+        "id": "cooking",
+        "name": "烘焙/烹饪🍳",
+        "is_matchable": true
+      }
+    ]
+  },
+  {
+    "id": "knowledge",
+    "name": "知识型活动",
+    "is_matchable": false,
+    "children": [
+      {
+        "id": "language_exchange",
+        "name": "语言交换🗣️",
+        "desc": "学二外的友友快来",
+        "is_matchable": true,
+        "children": [
+          {
+            "id": "japanese",
+            "name": "日语🇯🇵",
+            "is_matchable": true
+          },
+          {
+            "id": "spanish",
+            "name": "西班牙语🇪🇸",
+            "is_matchable": true
+          },
+          {
+            "id": "korean",
+            "name": "韩语🇰🇷",
+            "is_matchable": true
+          },
+          {
+            "id": "french",
+            "name": "法语🇫🇷",
+            "is_matchable": true
+          },
+          {
+            "id": "german",
+            "name": "德语🇩🇪",
+            "is_matchable": true
+          },
+          {
+            "id": "russian",
+            "name": "俄语🇷🇺",
+            "is_matchable": true
+          }
+        ]
+      },
+      {
+        "id": "study_together",
+        "name": "双人自习📚",
+        "desc": "一起学习，互相监督",
+        "is_matchable": true
+      },
+      {
+        "id": "other_knowledge",
+        "name": "其他知识类活动🤓",
+        "desc": "读书会、哲学讨论、编程开发交流等",
+        "is_matchable": true
+      }
+    ]
+  }
+]

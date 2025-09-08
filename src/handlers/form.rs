@@ -1,0 +1,233 @@
+//! # Form Handler
+//!
+//! This module implements form endpoints that allow verified users to submit
+//! and retrieve their form data including tags, traits, and profile information.
+
+use std::path::Path;
+use std::sync::Arc;
+
+use axum::{
+    Json,
+    extract::{Extension, State},
+    http::StatusCode,
+    response::IntoResponse,
+};
+use serde::{Deserialize, Serialize};
+use tokio::fs;
+use tracing::{debug, info, instrument, warn};
+use uuid::Uuid;
+
+use crate::error::{AppError, AppResult};
+use crate::middleware::AuthUser;
+use crate::models::{AppState, Form, Gender, UserStatus};
+use crate::utils::{file, static_object::UPLOAD_DIR};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FormRequest {
+    pub wechat_id: String,
+    pub gender: Gender,
+    pub familiar_tags: Vec<String>,
+    pub aspirational_tags: Vec<String>,
+    pub recent_topics: String,
+    pub self_traits: Vec<String>,
+    pub ideal_traits: Vec<String>,
+    pub physical_boundary: i16,
+    pub self_intro: String,
+    pub profile_photo_filename: Option<String>,
+}
+
+/// Submits or updates the authenticated user's form data.
+///
+/// POST /api/form FormRequest
+///
+/// This endpoint validates the form data including tag limits and profile photo filename,
+/// then saves or updates the user's form in the database. Only users with 'verified'
+/// or 'form_completed' status can access this endpoint.
+///
+/// # Returns
+///
+/// - `200 OK` with `Form` - Form submitted/updated successfully
+/// - `400 Bad Request` - Invalid form data or validation errors
+/// - `401 Unauthorized` - Missing or invalid authentication token
+/// - `403 Forbidden` - User status doesn't allow form submission
+/// - `500 Internal Server Error` - Database error
+#[instrument(
+    skip_all,
+    fields(
+        user_id = %user.user_id,
+        request_id = %uuid::Uuid::new_v4()
+    )
+)]
+pub async fn submit_form(
+    State(state): State<Arc<AppState>>,
+    Extension(user): Extension<AuthUser>,
+    Json(payload): Json<FormRequest>,
+) -> AppResult<impl IntoResponse> {
+    debug!("Processing form submission request");
+
+    // Check user status - only verified and form_completed users can submit
+    let user_status = UserStatus::query(&state.db_pool, &user.user_id).await?;
+
+    if !user_status.can_fill_form() {
+        warn!(current_status = %user_status, "User status doesn't allow form submission");
+        return Err(AppError::Forbidden(
+            "User status doesn't allow form submission",
+        ));
+    }
+
+    // Validate each field of the form
+    payload
+        .validate_request(state.tag_system)
+        .map_err(AppError::BadRequest)?;
+
+    // Validate profile photo filename if provided
+    if let Some(ref filename) = payload.profile_photo_filename {
+        validate_profile_photo_filename(filename, &user.user_id).await?;
+    }
+
+    // Insert or update form data and return the result
+    let form = sqlx::query_as!(
+        Form,
+        r#"
+        INSERT INTO forms (user_id, gender, familiar_tags, aspirational_tags, recent_topics,
+                          self_traits, ideal_traits, physical_boundary, self_intro, profile_photo_filename)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        ON CONFLICT (user_id)
+        DO UPDATE SET
+            gender = EXCLUDED.gender,
+            familiar_tags = EXCLUDED.familiar_tags,
+            aspirational_tags = EXCLUDED.aspirational_tags,
+            recent_topics = EXCLUDED.recent_topics,
+            self_traits = EXCLUDED.self_traits,
+            ideal_traits = EXCLUDED.ideal_traits,
+            physical_boundary = EXCLUDED.physical_boundary,
+            self_intro = EXCLUDED.self_intro,
+            profile_photo_filename = EXCLUDED.profile_photo_filename
+        RETURNING user_id, gender as "gender: Gender", familiar_tags, aspirational_tags,
+                  recent_topics, self_traits, ideal_traits, physical_boundary,
+                  self_intro, profile_photo_filename
+        "#,
+        user.user_id,
+        payload.gender as Gender,
+        &payload.familiar_tags,
+        &payload.aspirational_tags,
+        payload.recent_topics,
+        &payload.self_traits,
+        &payload.ideal_traits,
+        payload.physical_boundary,
+        payload.self_intro,
+        payload.profile_photo_filename
+    )
+    .fetch_one(&state.db_pool)
+    .await?;
+
+    // Update wechat_id in users table
+    sqlx::query!(
+        "UPDATE users SET wechat_id = $1 WHERE id = $2",
+        payload.wechat_id,
+        user.user_id
+    )
+    .execute(&state.db_pool)
+    .await?;
+
+    // Update user status to form_completed if currently verified
+    if user_status == UserStatus::Verified {
+        sqlx::query!(
+            "UPDATE users SET status = 'form_completed' WHERE id = $1",
+            user.user_id
+        )
+        .execute(&state.db_pool)
+        .await?;
+
+        debug!("User status updated to form_completed");
+    }
+
+    info!("Form submitted successfully");
+
+    Ok((StatusCode::OK, Json(form)))
+}
+
+/// Retrieves the authenticated user's form data.
+///
+/// GET /api/form
+///
+/// This endpoint returns the user's submitted form data. Only users with 'verified'
+/// or 'form_completed' status can access this endpoint.
+///
+/// # Returns
+///
+/// - `200 OK` with `Form` - Form data retrieved successfully
+/// - `401 Unauthorized` - Missing or invalid authentication token
+/// - `404 Not Found` - User has not submitted a form yet
+/// - `500 Internal Server Error` - Database error
+#[instrument(
+    skip_all,
+    fields(
+        user_id = %user.user_id,
+        request_id = %uuid::Uuid::new_v4()
+    )
+)]
+pub async fn get_form(
+    State(state): State<Arc<AppState>>,
+    Extension(user): Extension<AuthUser>,
+) -> AppResult<impl IntoResponse> {
+    debug!("Processing get form request");
+
+    let form = sqlx::query_as!(
+        Form,
+        r#"
+        SELECT user_id, gender as "gender: Gender", familiar_tags, aspirational_tags,
+               recent_topics, self_traits, ideal_traits, physical_boundary,
+               self_intro, profile_photo_filename
+        FROM forms
+        WHERE user_id = $1
+        "#,
+        user.user_id
+    )
+    .fetch_optional(&state.db_pool)
+    .await?
+    .ok_or_else(|| {
+        info!("User has not submitted a form yet");
+        AppError::NotFound("Form not found")
+    })?;
+
+    info!("Form retrieved successfully");
+    Ok((StatusCode::OK, Json(form)))
+}
+
+async fn validate_profile_photo_filename(filename: &str, user_id: &Uuid) -> Result<(), AppError> {
+    // Security checks: ensure filename is not malicious
+    if filename.contains("..")
+        || !filename
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '.')
+    {
+        warn!("Profile photo filename contains forbidden characters");
+        return Err(AppError::BadRequest(
+            "Profile photo filename contains forbidden characters",
+        ));
+    }
+
+    let photo_uuid = file::FileManager::parse_uuid_from_path(filename).ok_or_else(|| {
+        warn!("Invalid profile photo filename format: {}", filename);
+        AppError::BadRequest("Invalid profile photo filename")
+    })?;
+
+    if photo_uuid != *user_id {
+        warn!(
+            "Photo UUID {} doesn't match user ID {}",
+            photo_uuid, user_id
+        );
+        return Err(AppError::BadRequest("Photo UUID doesn't match user ID"));
+    }
+
+    let full_path = Path::new(UPLOAD_DIR.as_str())
+        .join("profile_photos")
+        .join(filename);
+    if !fs::try_exists(&full_path).await.unwrap_or(false) {
+        warn!("Profile photo file doesn't exist: {:?}", full_path);
+        return Err(AppError::BadRequest("Profile photo file doesn't exist"));
+    }
+
+    Ok(())
+}

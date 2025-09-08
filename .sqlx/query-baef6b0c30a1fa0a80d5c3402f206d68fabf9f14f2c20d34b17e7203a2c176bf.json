@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM vetoes",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "baef6b0c30a1fa0a80d5c3402f206d68fabf9f14f2c20d34b17e7203a2c176bf"
+}

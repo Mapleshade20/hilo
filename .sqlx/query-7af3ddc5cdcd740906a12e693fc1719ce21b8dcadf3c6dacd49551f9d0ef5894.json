@@ -1,0 +1,36 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            f.gender as \"gender: Gender\",\n            COUNT(*) as count\n        FROM forms f\n        JOIN users u ON f.user_id = u.id\n        WHERE u.status = 'form_completed'\n        GROUP BY f.gender\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "gender: Gender",
+        "type_info": {
+          "Custom": {
+            "name": "gender",
+            "kind": {
+              "Enum": [
+                "male",
+                "female"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "7af3ddc5cdcd740906a12e693fc1719ce21b8dcadf3c6dacd49551f9d0ef5894"
+}

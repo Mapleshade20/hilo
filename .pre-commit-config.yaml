@@ -1,0 +1,43 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: check-json
+      - id: check-toml
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: forbid-submodules
+      - id: fix-byte-order-marker
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+      - id: trailing-whitespace
+  - repo: https://github.com/FeryET/pre-commit-rust
+    rev: v1.2.1
+    hooks:
+      - id: cargo-check
+        fail_fast: true
+        stages: [pre-commit]
+      - id: clippy
+        stages: [pre-commit]
+      - id: fmt
+        stages: [pre-commit]
+  - repo: local
+    hooks:
+      - id: sqlx-prepare
+        name: Prepare SQLx
+        description: Ensures sqlx offline data is up-to-date
+        entry: cargo sqlx prepare --check -- --all-targets
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.2.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args: [feat, fix, chore, test, ci, refactor, perf, docs]

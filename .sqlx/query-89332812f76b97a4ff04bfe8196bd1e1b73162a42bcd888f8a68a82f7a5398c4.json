@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO forms (user_id, gender, familiar_tags, aspirational_tags, recent_topics, self_traits, ideal_traits, physical_boundary, self_intro)\n           VALUES ($1, 'male', $2, $3, 'test topics', '{}', '{}', 2, 'test intro')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "TextArray",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "89332812f76b97a4ff04bfe8196bd1e1b73162a42bcd888f8a68a82f7a5398c4"
+}

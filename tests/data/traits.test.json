@@ -1,0 +1,30 @@
+[
+  {
+    "id": "emotionally_stable",
+    "name": "情绪稳定"
+  },
+  {
+    "id": "humor",
+    "name": "幽默感"
+  },
+  {
+    "id": "curiosity",
+    "name": "好奇心爆棚"
+  },
+  {
+    "id": "reliable",
+    "name": "超级靠谱"
+  },
+  {
+    "id": "empathy",
+    "name": "共情能力强"
+  },
+  {
+    "id": "discipline",
+    "name": "自律"
+  },
+  {
+    "id": "bookworm",
+    "name": "深度阅读爱好者"
+  }
+]

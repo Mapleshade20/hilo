@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM vetoes WHERE vetoer_id = $1 AND vetoed_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "dd3d0be87839c9a1e881c6b6be4e072d69e9d02652d79007b25cdf3a68687093"
+}

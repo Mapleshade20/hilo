@@ -1,0 +1,31 @@
+# Configuration file for tag assignments in the Hilo matching test
+# Format: tag_id: familiar_users | aspirational_users
+# Users are numbered 1, 2, 3, etc.
+# Odd numbers = male, even numbers = female
+
+# Sports tags
+volleyball: 1, 2, 3 | 5, 9
+basketball: 4, 5 | 1, 2
+soccer: 6, 10 | 3
+badminton: |
+running: |
+
+# Desktop tags
+board_games: |
+pc_fps: 1, 3 | 2
+pc_moba: 4 |
+mobile_fps: |
+music_games: 7, 10 | 5
+creative_games: 6, 8 |
+
+# Arts tags
+instruments: |
+drawing_photo: |
+cooking: |
+
+# Knowledge activities
+spanish: 1 | 2
+japanese: 1 |
+korean: |
+french: |
+study_together: 2, 5, 9 | 4

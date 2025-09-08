@@ -1,0 +1,48 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT email, status as \"status: UserStatus\", grade FROM users WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "email",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "status: UserStatus",
+        "type_info": {
+          "Custom": {
+            "name": "user_status",
+            "kind": {
+              "Enum": [
+                "unverified",
+                "verification_pending",
+                "verified",
+                "form_completed",
+                "matched",
+                "confirmed"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "grade",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "a6dc9f388ca3c2507c9476353273c1a5d517ee3424e89754d9eb1aef0a98d1c3"
+}

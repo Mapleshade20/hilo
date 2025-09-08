@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO users (email, status, wechat_id, grade) VALUES ($1, 'verified', 'test_wechat', 'Graduate') RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Varchar"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f348e57151761ee80953c21c6071a9d8e43f98e47a0545055e8a2a345bd53106"
+}

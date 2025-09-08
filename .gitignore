@@ -1,3 +1,7 @@
 /target
 /.vscode
-
+/priv
+/uploads
+/uploads_test
+/data
+/.claude

@@ -1,0 +1,48 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT card_photo_filename, grade, status as \"status: UserStatus\" FROM users WHERE email = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "card_photo_filename",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "grade",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "status: UserStatus",
+        "type_info": {
+          "Custom": {
+            "name": "user_status",
+            "kind": {
+              "Enum": [
+                "unverified",
+                "verification_pending",
+                "verified",
+                "form_completed",
+                "matched",
+                "confirmed"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "0b665d28bfef56254c03a525a5a3ea47a7a122f06a3ff30df676431671d62549"
+}

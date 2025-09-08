@@ -1,0 +1,36 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT COUNT(*) FROM users WHERE status = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        {
+          "Custom": {
+            "name": "user_status",
+            "kind": {
+              "Enum": [
+                "unverified",
+                "verification_pending",
+                "verified",
+                "form_completed",
+                "matched",
+                "confirmed"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "9e0cb87a47445f958b698c1b427f7e0563078fc25a189e46abf5a13e91871ae8"
+}

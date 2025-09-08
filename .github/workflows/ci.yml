@@ -1,0 +1,60 @@
+name: Build and Test
+
+on:
+  push:
+    branches:
+      - dev
+  pull_request:
+    branches:
+      - dev
+
+env:
+  CARGO_TERM_COLOR: always
+  DATABASE_URL: "postgres://hilo_user:hilo_pass@localhost:5432/hilo_db"
+  APP_ENV: test
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: hilo_user
+          POSTGRES_PASSWORD: hilo_pass
+          POSTGRES_DB: hilo_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up toolchain and cache
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        # with:
+        #   components: rustfmt, clippy
+
+      - name: Install sqlx-cli
+        run: cargo install sqlx-cli --no-default-features --features postgres --locked
+
+      - name: Run database migrations
+        run: sqlx migrate run
+
+      # - name: Check format
+      #   run: cargo fmt --all --check
+
+      # - name: Clippy
+      #   run: cargo clippy -- -D warnings
+
+      - name: Build
+        run: cargo build
+
+      - name: Test
+        run: cargo test
