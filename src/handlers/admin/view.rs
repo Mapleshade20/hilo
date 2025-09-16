@@ -31,10 +31,10 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use time::OffsetDateTime;
 use tower_http::services::ServeFile;
-use tracing::{error, info, instrument};
+use tracing::{error, info, instrument, warn};
 use uuid::Uuid;
 
-use super::{AdminState, convert_tags_to_stats};
+use super::{AdminState, convert_tags_to_stats, get_user_id_by_email};
 use crate::error::{AppError, AppResult};
 use crate::models::{Form, Gender, UserStatus};
 use crate::utils::static_object::{TAG_TREE, UPLOAD_DIR};
@@ -237,9 +237,18 @@ pub struct UserFormInfo {
     pub profile_photo_uri: Option<String>,
 }
 
+/// Request payload for admin user verification
+#[derive(Debug, Deserialize)]
+pub struct QueryUserRequest {
+    /// User ID (takes priority if both id and email are provided)
+    pub user_id: Option<Uuid>,
+    /// User email (used if user_id is not provided)
+    pub email: Option<String>,
+}
+
 /// Gets detailed information for a specific user.
 ///
-/// GET /api/admin/user/{user_id}
+/// GET /api/admin/user
 ///
 /// This endpoint returns comprehensive user information including basic profile data,
 /// form responses (if submitted), and links to uploaded files. Used by admins for
@@ -253,8 +262,18 @@ pub struct UserFormInfo {
 #[instrument(skip_all, fields(request_id = %uuid::Uuid::new_v4()))]
 pub async fn get_user_detail(
     State(state): State<Arc<AdminState>>,
-    AxumPath(user_id): AxumPath<Uuid>,
+    Json(payload): Json<QueryUserRequest>,
 ) -> AppResult<impl IntoResponse> {
+    // Get user ID (prioritize user_id over email)
+    let user_id = if let Some(id) = payload.user_id {
+        id
+    } else if let Some(email) = &payload.email {
+        get_user_id_by_email(&state.db_pool, email).await?
+    } else {
+        warn!("Neither user_id nor email provided");
+        return Err(AppError::BadRequest("Must provide either user_id or email"));
+    };
+
     // Get user basic info
     let user = sqlx::query!(
         r#"

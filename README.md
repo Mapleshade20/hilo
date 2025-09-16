@@ -29,11 +29,11 @@
 2. **Account Creation**: Upon successful email verification:
    - User account is created with `unverified` status
    - JWT access and refresh tokens are issued for authentication
-   - Users can upload their student ID card for verification
+   - Users can upload their student ID card for verification, meanwhile the status is `verification_pending`
 
 3. **ID Card Upload**: Users upload a photo of their student ID card
    - Images are validated and stored securely
-   - Admin's review changes user status from `unverified` to `verified`
+   - Admin's review changes user status to `verified`/`unverified`
 
 ### Part II. Form Submission
 
@@ -66,13 +66,13 @@ Veto means rejection.
 ### Part IV. Final Matching & Results
 
 1. **Admin Trigger**: Administrators initiate the final matching process:
-   - Only users with `form_completed` status are included
+   - Only users with `form_completed` status are included, after this their status becomes updated to `matched` (unless unmatched)
    - Vetoes are considered to exclude incompatible pairs
    - Algorithm: **Greedy**
 
 2. **Match Results**: Users receive their final match information and decide if their accept it:
    - Displayed info: `familiar_tags`, `aspirational_tags`, `self_intro`, `email_domain`, `grade`, profile photo (if any)
-   - Once both users accepted the match, `wechat_id` is displayed
+   - Once both users accepted the match, `wechat_id` is displayed, and status becomes `confirmed`
    - A rejection from either side will revert both users' status to `form_completed`. Admin can trigger new final matching after a period of time, and only unmatched users will be included in this round.
 
 ## API Documentation
@@ -127,7 +127,7 @@ _All protected endpoints require valid JWT Bearer token in Authorization header_
 #### Profile Management
 
 - `GET /api/profile` - Get current user profile information
-  - Returns personal info with final match result if any, otherwise the final result field is null; wechat_id is not null when both sides accept the result
+  - If the user doesn't have a final match partner, the final result field will be null; wechat_id becomes not null once both sides have accepted the result
 
   ```json
   {
@@ -147,7 +147,7 @@ _All protected endpoints require valid JWT Bearer token in Authorization header_
   ```
 
 - `POST /api/upload/profile-photo` - Upload user profile photo
-  - Request body: Multipart form with image file
+  - Request body: Multipart form with an image `file` field
   - Returns filename for form submission
   - Response: `{"filename": "2536f5b0-0f6c-401b-9f92-be95efe571ed.jpg"}`
 
@@ -195,7 +195,7 @@ _All protected endpoints require valid JWT Bearer token in Authorization header_
 #### ID Verification
 
 - `POST /api/upload/card` - Upload student ID card for verification
-  - Multipart form with ID card image and `grade` text field
+  - Multipart form with ID card image `card` field and `grade` text field
   - Changes user status to verification pending
   - Returns `200 OK` with some user info
   - Response:
@@ -211,7 +211,7 @@ _All protected endpoints require valid JWT Bearer token in Authorization header_
 
 #### Matching System
 
-- `GET /api/veto/previews` - Get current match previews for review
+- `GET /api/veto/previews` - Get current match previews for user to decide who to give veto
   - Response:
 
   ```json
@@ -267,7 +267,7 @@ _Admin endpoints run on separate port (configured via `ADMIN_ADDRESS`)_
 #### User Management
 
 - `GET /api/admin/users` - Get paginated users overview
-  - Query Parameters:
+  - JSON request body:
     - `page` (default: 1) - Page number
     - `limit` (default: 20, max: 100) - Items per page
     - `status` (default: null, accpetable: `unverified`|`verification_pending`|`verified`|`form_completed`|`matched`|`confirmed`) - Filter a specific status
@@ -290,7 +290,8 @@ _Admin endpoints run on separate port (configured via `ADMIN_ADDRESS`)_
   }
   ```
 
-- `GET /api/admin/user/{user_id}` - Get detailed user information
+- `GET /api/admin/user` - Get detailed user information
+  - JSON request body: `email` or `user_id`
 
   ```json
   {
