@@ -1,6 +1,7 @@
 .claude/
 .git/
 .gitignore
+.dockerignore
 .github/
 .env
 external_tests/
@@ -13,3 +14,4 @@ uploads_test/
 *.yml
 *.yaml
 LICENSE
+Dockerfile
