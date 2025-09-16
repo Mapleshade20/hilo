@@ -234,7 +234,7 @@ pub fn create_male_form_submission() -> serde_json::Value {
         "wechat_id": "test_wechat_123",
         "gender": "male",
         "familiar_tags": ["basketball", "pc_fps", "japanese"],
-        "aspirational_tags": ["cooking", "study_together"],
+        "aspirational_tags": ["study_together"],
         "recent_topics": "I've been really interested in machine learning and AI lately, especially large language models and their applications in natural language processing.",
         "self_traits": ["humor", "curiosity", "reliable"],
         "ideal_traits": ["humor", "curiosity", "reliable"],
@@ -247,7 +247,7 @@ pub fn create_female_form_submission() -> serde_json::Value {
     json!({
         "wechat_id": "test_wechat_456",
         "gender": "female",
-        "familiar_tags": ["dance", "cooking", "china"],
+        "familiar_tags": ["dance", "china"],
         "aspirational_tags": ["wild", "board_games"],
         "recent_topics": "I've been exploring different cooking techniques from various cultures and really enjoying the process of creating new dishes.",
         "self_traits": ["humor", "curiosity", "reliable"],
@@ -296,7 +296,7 @@ pub async fn create_form_with_profile_photo(
     json!({
         "wechat_id": "test_wechat_456",
         "gender": "female",
-        "familiar_tags": ["dance", "cooking", "china"],
+        "familiar_tags": ["dance", "china"],
         "aspirational_tags": ["wild", "board_games"],
         "recent_topics": "I've been exploring different cooking techniques from various cultures and really enjoying the process of creating new dishes.",
         "self_traits": ["humor", "curiosity", "reliable"],

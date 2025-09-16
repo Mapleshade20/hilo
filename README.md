@@ -1,4 +1,4 @@
-# Hilo: Social Pairing Event Backend - Project Encontrar
+# Hilo: Social Pairing Event Backend - Project Contigo
 
 [![Dev CI](https://github.com/Mapleshade20/hilo/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/Mapleshade20/hilo/actions)
 [![Release](https://img.shields.io/github/v/release/Mapleshade20/hilo?logo=rocket)](https://github.com/Mapleshade20/hilo/releases)

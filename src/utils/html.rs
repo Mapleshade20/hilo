@@ -2,7 +2,7 @@
 ///
 /// This function creates a responsive HTML email body that includes:
 /// 1. A hidden preheader for email client previews.
-/// 2. The project's branding (Project Encontrar).
+/// 2. The project's branding.
 /// 3. The verification code, displayed prominently.
 /// 4. A professional and clean design using inline CSS for maximum compatibility.
 ///
@@ -23,7 +23,7 @@ pub fn generate_verification_email_html(code: &str) -> String {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Project Encontrar Verification Code</title>
+    <title>Project Contigo Verification Code</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol'; background-color: #f0f2f5;">
 
@@ -42,7 +42,7 @@ pub fn generate_verification_email_html(code: &str) -> String {
                     <tr>
                         <td align="center" style="padding: 40px 20px 20px 20px;">
                             <h1 style="margin: 0; color: #1c1e21; font-size: 32px; font-weight: 600;">🎉 Welcome 🥳</h1>
-                            <p style="margin: 4px 0 0 0; color: #606770; font-size: 14px;">to Project Encontrar</p>
+                            <p style="margin: 4px 0 0 0; color: #606770; font-size: 14px;">to Project Contigo</p>
                         </td>
                     </tr>
 
@@ -51,7 +51,7 @@ pub fn generate_verification_email_html(code: &str) -> String {
                         <td style="padding: 20px 40px;">
                             <h2 style="margin: 0 0 24px 0; font-size: 22px; font-weight: 600; color: #1c1e21; text-align: center;">Confirm Your Email Address</h2>
                             <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #606770; text-align: center;">
-                                Thanks for signing up for Project Encontrar! Please use the following code to complete your registration.
+                                Thanks for signing up for Project Contigo! Please use the following code to complete your registration.
                             </p>
 
                             <!-- Verification Code Box -->
@@ -71,7 +71,7 @@ pub fn generate_verification_email_html(code: &str) -> String {
                     <tr>
                         <td align="center" style="padding: 30px 40px; border-top: 1px solid #e1e4e8;">
                             <p style="margin: 0; font-size: 12px; color: #90949c; line-height: 1.5;">
-                                &copy; {current_year} Project Encontrar. All rights reserved.<br>
+                                &copy; {current_year} Project Contigo. All rights reserved.<br>
                                 This email was sent to you as part of the account verification process.
                             </p>
                         </td>

@@ -149,6 +149,16 @@ pub static MATCH_PREVIEW_INTERVAL_MINUTES: LazyLock<u64> = LazyLock::new(|| {
         })
 });
 
+pub static MAX_PREVIEW_CANDIDATES: LazyLock<usize> = LazyLock::new(|| {
+    env::var("MAX_PREVIEW_CANDIDATES")
+        .ok()
+        .and_then(|val| val.parse().ok())
+        .unwrap_or_else(|| {
+            error!("Invalid or missing MAX_PREVIEW_CANDIDATES env var, using fallback 6");
+            6
+        })
+});
+
 pub static UPLOAD_DIR: LazyLock<String> = LazyLock::new(|| {
     env::var("UPLOAD_DIR").unwrap_or_else(|_| {
         error!("Missing UPLOAD_DIR env var, using fallback './uploads'");

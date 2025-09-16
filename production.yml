@@ -35,7 +35,7 @@ services:
       ALLOWED_GRADES: "undergraduate:graduate"
       EMAIL_PROVIDER: "external"
       MAIL_API_URL: "https://api.mailgun.net/v3/mail.maplewrt.com/messages"
-      SENDER_EMAIL: "Project Encontrar <no-reply@mail.maplewrt.com>"
+      SENDER_EMAIL: "Project Contigo <no-reply@mail.maplewrt.com>"
       DATABASE_URL: "postgres://hilo_user:hilo_pass@db:5432/hilo_db" # Updated via entrypoint
       RUST_LOG: "info"
       NO_COLOR: 1
@@ -49,6 +49,7 @@ services:
       TAG_SCORE_DECAY_FACTOR: 0.5
       COMPLEMENTARY_TAG_WEIGHT: 0.8
       TRAIT_MATCH_POINTS: 2.0
+      MAX_PREVIEW_CANDIDATES: 6
 
       # Location to the secrets
       JWT_SECRET_FILE: "/run/secrets/hilo_jwt_secret"

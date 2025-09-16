@@ -162,10 +162,7 @@ async fn test_get_form_success(pool: PgPool) {
         retrieved_form.familiar_tags,
         vec!["basketball", "pc_fps", "japanese"]
     );
-    assert_eq!(
-        retrieved_form.aspirational_tags,
-        vec!["cooking", "study_together"]
-    );
+    assert_eq!(retrieved_form.aspirational_tags, vec!["study_together"]);
     assert_eq!(retrieved_form.physical_boundary, 2);
     assert!(retrieved_form.recent_topics.contains("machine learning"));
     assert!(
@@ -260,16 +257,17 @@ async fn test_submit_form_too_many_tags(pool: PgPool) {
     form_data["familiar_tags"] = json!([
         "basketball",
         "volleyball",
-        "pc_fps",
-        "japanese",
         "soccer",
+        "pc_fps",
+        "moba",
+        "japanese",
         "badminton"
     ]);
     form_data["aspirational_tags"] = json!([
-        "cooking",
+        "crafts",
         "study_together",
         "drawing_photo",
-        "crafts",
+        "spanish",
         "instruments",
         "dance"
     ]);
@@ -342,7 +340,7 @@ async fn test_submit_form_invalid_tags(pool: PgPool) {
 
     // Test with duplicate tags between familiar and aspirational
     form_data["familiar_tags"] = json!(["pc_fps"]);
-    form_data["aspirational_tags"] = json!(["pc_fps", "cooking"]);
+    form_data["aspirational_tags"] = json!(["pc_fps", "crafts"]);
 
     let response = client
         .post(format!("{}/api/form", &address))

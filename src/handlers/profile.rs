@@ -12,7 +12,7 @@ use axum::{
     response::IntoResponse,
 };
 use serde::{Deserialize, Serialize};
-use tracing::{debug, error, info, instrument};
+use tracing::{debug, error, instrument, trace};
 
 use crate::error::{AppError, AppResult};
 use crate::middleware::AuthUser;
@@ -53,7 +53,7 @@ pub async fn get_profile(
     State(state): State<Arc<AppState>>,
     Extension(user): Extension<AuthUser>,
 ) -> AppResult<impl IntoResponse> {
-    debug!("Processing profile request");
+    trace!("Processing profile request");
 
     // Query user profile from database
     let row_self = sqlx::query!(
@@ -80,7 +80,7 @@ pub async fn get_profile(
         None
     };
 
-    info!("Profile retrieved successfully");
+    debug!("Profile retrieved successfully");
     Ok((
         StatusCode::OK,
         Json(ProfileResponse {

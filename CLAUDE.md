@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Hilo** is a Rust-based social pairing backend for Project Encontrar that matches university students based on interests and preferences. It uses email verification with university domains, collects user forms (like questionnaires), and provides a matching algorithm to pair compatible users.
+**Hilo** is a Rust-based social pairing backend for Project Contigo that matches university students based on interests and preferences. It uses email verification with university domains, collects user forms (like questionnaires), and provides a matching algorithm to pair compatible users.
 
 ### Core Architecture
 

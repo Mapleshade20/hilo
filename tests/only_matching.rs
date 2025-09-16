@@ -1,3 +1,8 @@
+//! Tests for the matching algorithm in isolation, without database dependencies.
+//!
+//! NOTE: Only this test uses `tests/data/tags.test.json` to load a simplified tag system.
+//! Other tests use the full tag system from `tags.json` to ensure comprehensive coverage.
+
 use hilo::models::{Form, Gender, TagSystem};
 use hilo::services::matching::MatchingService;
 use std::collections::HashMap;
@@ -163,7 +168,7 @@ fn test_hierarchical_tag_matching() {
         ("competitive".to_string(), 9),
         ("pc_fps".to_string(), 8),
         // -- Arts tags
-        ("cooking".to_string(), 2),
+        ("crafts".to_string(), 2),
         // -- Language tags
         ("language_exchange".to_string(), 12),
         ("spanish".to_string(), 10),
@@ -230,7 +235,7 @@ fn test_hierarchical_tag_matching() {
     let user3 = create_test_form(
         Uuid::new_v4(),
         Gender::Female,
-        vec!["cooking".to_string()], // completely different tag
+        vec!["crafts".to_string()], // completely different tag
         vec!["spanish".to_string()],
         vec!["discipline".to_string()],
         vec!["empathy".to_string()],

@@ -14,7 +14,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use tokio::fs;
-use tracing::{debug, info, instrument, warn};
+use tracing::{debug, info, instrument, trace, warn};
 use uuid::Uuid;
 
 use crate::error::{AppError, AppResult};
@@ -171,7 +171,7 @@ pub async fn get_form(
     State(state): State<Arc<AppState>>,
     Extension(user): Extension<AuthUser>,
 ) -> AppResult<impl IntoResponse> {
-    debug!("Processing get form request");
+    trace!("Processing get form request");
 
     let form = sqlx::query_as!(
         Form,
@@ -187,11 +187,11 @@ pub async fn get_form(
     .fetch_optional(&state.db_pool)
     .await?
     .ok_or_else(|| {
-        info!("User has not submitted a form yet");
+        debug!("User has not submitted a form yet");
         AppError::NotFound("Form not found")
     })?;
 
-    info!("Form retrieved successfully");
+    debug!("Form retrieved successfully");
     Ok((StatusCode::OK, Json(form)))
 }
 
