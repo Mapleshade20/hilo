@@ -91,9 +91,7 @@ async fn test_submit_form_upsert_behavior(pool: PgPool) {
     assert_eq!(user_status.status, UserStatus::FormCompleted);
 
     // Submit updated form
-    let mut updated_form = create_female_form_submission();
-    updated_form["recent_topics"] =
-        json!("Updated interests: Now I'm into sustainable cooking and zero-waste lifestyle.");
+    let updated_form = create_female_form_submission();
 
     let response = client
         .post(format!("{}/api/form", &address))
@@ -102,9 +100,9 @@ async fn test_submit_form_upsert_behavior(pool: PgPool) {
         .send()
         .await
         .expect("Failed to submit updated form");
-    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    assert_eq!(response.status(), reqwest::StatusCode::FORBIDDEN);
 
-    // Verify the form was updated, not duplicated
+    // Verify the form was not duplicated
     let form_count = sqlx::query_scalar!(
         "SELECT COUNT(*) FROM forms WHERE user_id = (SELECT id FROM users WHERE email = $1)",
         test_email
@@ -114,7 +112,7 @@ async fn test_submit_form_upsert_behavior(pool: PgPool) {
     .expect("Failed to count forms");
     assert_eq!(form_count, Some(1));
 
-    // Verify the content was actually updated
+    // Verify the content was not updated
     let form = sqlx::query!(
         r#"SELECT recent_topics, gender as "gender: Gender" FROM forms WHERE user_id = (SELECT id FROM users WHERE email = $1)"#,
         test_email
@@ -122,8 +120,7 @@ async fn test_submit_form_upsert_behavior(pool: PgPool) {
     .fetch_one(&pool)
     .await
     .expect("Failed to fetch form");
-    assert!(form.recent_topics.contains("sustainable cooking"));
-    assert_eq!(form.gender, Gender::Female);
+    assert_eq!(form.gender, Gender::Male);
 }
 
 #[sqlx::test]

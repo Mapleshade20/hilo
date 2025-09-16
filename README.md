@@ -154,7 +154,7 @@ _All protected endpoints require valid JWT Bearer token in Authorization header_
 #### Form Management
 
 - `POST /api/form` - Submit or update user form
-  - Only accessible to verified users
+  - Only accessible to verified users; once submitted, it cannot be changed
   - Returns `200 OK` with partial submitted form data (without wechat_id field), see `GET /api/form` response
   - JSON request body:
 
