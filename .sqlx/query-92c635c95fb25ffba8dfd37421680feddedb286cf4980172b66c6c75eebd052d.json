@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO users (email, status) VALUES ($1, 'verified') RETURNING id",
+  "query": "INSERT INTO users (email, status, wechat_id) VALUES ($1, 'verified', 'wxid1') RETURNING id",
   "describe": {
     "columns": [
       {
@@ -18,5 +18,5 @@
       false
     ]
   },
-  "hash": "c9a6bddf9eff9fdd08bc4ae819b405cbbe7dedba7c28795f8fa7591416e0d750"
+  "hash": "92c635c95fb25ffba8dfd37421680feddedb286cf4980172b66c6c75eebd052d"
 }

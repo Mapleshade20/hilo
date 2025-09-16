@@ -61,6 +61,7 @@ pub struct UserOverview {
     pub id: Uuid,
     pub email: String,
     pub status: UserStatus,
+    pub wechat_id: Option<String>,
 }
 
 /// Paginated response wrapper
@@ -129,7 +130,7 @@ pub async fn get_users_overview(
         sqlx::query_as!(
             UserOverview,
             r#"
-            SELECT id, email, status as "status: UserStatus"
+            SELECT id, email, status as "status: UserStatus", wechat_id
             FROM users
             WHERE status = $1
             ORDER BY created_at DESC
@@ -145,7 +146,7 @@ pub async fn get_users_overview(
         sqlx::query_as!(
             UserOverview,
             r#"
-            SELECT id, email, status as "status: UserStatus"
+            SELECT id, email, status as "status: UserStatus", wechat_id
             FROM users
             ORDER BY created_at DESC
             LIMIT $1 OFFSET $2
@@ -168,7 +169,7 @@ pub async fn get_users_overview(
         },
     };
 
-    Ok((StatusCode::OK, Json(response)).into_response())
+    Ok((StatusCode::OK, Json(response)))
 }
 
 /// Serves student card photos for admin review.
