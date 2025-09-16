@@ -65,9 +65,8 @@ pub async fn submit_form(
 ) -> AppResult<impl IntoResponse> {
     debug!("Processing form submission request");
 
-    // Check user status - only verified and form_completed users can submit
+    // Check user status
     let user_status = UserStatus::query(&state.db_pool, &user.user_id).await?;
-
     if !user_status.can_fill_form() {
         warn!(current_status = %user_status, "User status doesn't allow form submission");
         return Err(AppError::Forbidden(

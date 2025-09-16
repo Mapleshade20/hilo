@@ -64,10 +64,10 @@ impl UserStatus {
     }
 
     /// Returns true if the user is allowed to fill/update a form or upload a profile photo.
-    /// Only verified and form_completed users have access.
+    /// Only verified users have access. Updates are not allowed after form completion.
     #[inline]
     pub fn can_fill_form(&self) -> bool {
-        matches!(self, UserStatus::Verified | UserStatus::FormCompleted)
+        matches!(self, UserStatus::Verified)
     }
 
     /// Returns true if the user has completed card verification.
