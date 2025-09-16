@@ -250,6 +250,9 @@ impl MatchingService {
             return Ok(());
         }
 
+        // Fetch all existing vetoes
+        let veto_map = Self::build_map_vetoed_as_key(db_pool).await?;
+
         // Calculate tag frequencies for IDF scoring
         let tag_frequencies = Self::calculate_tag_frequencies(&forms);
         let total_user_count = forms.len() as u32;
@@ -264,6 +267,13 @@ impl MatchingService {
             for (j, candidate_form) in forms.iter().enumerate() {
                 if i == j {
                     continue; // Skip self
+                }
+
+                // Skip if candidate has vetoed this user
+                if let Some(vetoers) = veto_map.get(&user_form.user_id)
+                    && vetoers.contains(&candidate_form.user_id)
+                {
+                    continue;
                 }
 
                 let score = Self::calculate_match_score(
@@ -359,6 +369,25 @@ impl MatchingService {
         .await?;
 
         Ok(())
+    }
+
+    /// Build a map of vetoed_id -> set of vetoer_ids for efficient lookup
+    pub async fn build_map_vetoed_as_key(
+        db_pool: &PgPool,
+    ) -> Result<HashMap<Uuid, HashSet<Uuid>>, sqlx::Error> {
+        let vetoes = sqlx::query!("SELECT vetoer_id, vetoed_id FROM vetoes")
+            .fetch_all(db_pool)
+            .await?;
+
+        let mut veto_map: HashMap<Uuid, HashSet<Uuid>> = HashMap::new();
+        for veto in vetoes {
+            veto_map
+                .entry(veto.vetoed_id)
+                .or_default()
+                .insert(veto.vetoer_id);
+        }
+
+        Ok(veto_map)
     }
 
     /// Spawn the periodic preview generation task

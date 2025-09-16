@@ -25,8 +25,8 @@ use tracing::{error, info, instrument, warn};
 use uuid::Uuid;
 
 use super::{
-    AdminState, build_veto_map, calculate_tag_frequencies, create_final_match, fetch_all_vetoes,
-    get_user_id_by_email, get_user_status, is_vetoed,
+    AdminState, calculate_tag_frequencies, create_final_match, get_user_id_by_email,
+    get_user_status, is_vetoed,
 };
 use crate::error::{AppError, AppResult};
 use crate::models::{TagSystem, UserStatus};
@@ -92,8 +92,7 @@ async fn execute_final_matching(db_pool: &PgPool, tag_system: &TagSystem) -> App
     }
 
     // Fetch all veto records
-    let vetoes = fetch_all_vetoes(db_pool).await?;
-    let veto_map = build_veto_map(&vetoes);
+    let veto_map = MatchingService::build_map_vetoed_as_key(db_pool).await?;
 
     // Calculate tag frequencies for IDF scoring
     let tag_frequencies = calculate_tag_frequencies(&forms);

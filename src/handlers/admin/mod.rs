@@ -40,7 +40,7 @@ use tracing::warn;
 use uuid::Uuid;
 
 use crate::error::{AppError, AppResult};
-use crate::models::{FinalMatch, Form, TagNode, TagSystem, UserStatus, Veto};
+use crate::models::{FinalMatch, Form, TagNode, TagSystem, UserStatus};
 use crate::utils::static_object::TAG_SYSTEM;
 use action::{trigger_final_matching, update_match_previews, verify_user};
 use view::{
@@ -170,26 +170,6 @@ fn is_vetoed(user_a: Uuid, user_b: Uuid, veto_map: &HashMap<Uuid, HashSet<Uuid>>
     veto_map
         .get(&user_a)
         .is_some_and(|vetoed_set| vetoed_set.contains(&user_b))
-}
-
-/// Build a map of vetoer_id -> set of vetoed_ids for efficient lookup
-fn build_veto_map(vetoes: &[Veto]) -> HashMap<Uuid, HashSet<Uuid>> {
-    let mut veto_map = HashMap::new();
-
-    for veto in vetoes {
-        veto_map
-            .entry(veto.vetoer_id)
-            .or_insert_with(HashSet::new)
-            .insert(veto.vetoed_id);
-    }
-
-    veto_map
-}
-
-async fn fetch_all_vetoes(db_pool: &PgPool) -> Result<Vec<Veto>, sqlx::Error> {
-    sqlx::query_as!(Veto, "SELECT id, vetoer_id, vetoed_id FROM vetoes")
-        .fetch_all(db_pool)
-        .await
 }
 
 async fn create_final_match(
