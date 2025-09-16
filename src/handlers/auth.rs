@@ -21,7 +21,7 @@ use axum::{
 };
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{debug, error, info, instrument, trace, warn};
 use validator::Validate;
 
 use crate::error::{AppError, AppResult};
@@ -120,11 +120,7 @@ pub async fn send_verification_code(
     // Send email
     state
         .email_service
-        .send_email(
-            &payload.email,
-            "Your login code to Project Encontrar",
-            &code,
-        )
+        .send_email(&payload.email, "Your login code to Project Contigo", &code)
         .await
         .map_err(|e| {
             error!(error = %e, "Failed to send verification code");
@@ -196,7 +192,7 @@ pub async fn verify_code(
     }
 
     // Insert user in DB
-    debug!("Creating/updating user in database");
+    trace!("Creating/updating user in database");
     let user_id = sqlx::query_scalar!(
         r#"
         INSERT INTO users (email, status) VALUES ($1, 'unverified')
@@ -208,10 +204,10 @@ pub async fn verify_code(
     .fetch_one(&state.db_pool)
     .await?;
 
-    info!(user_id = %user_id, "User created/updated successfully");
+    debug!(user_id = %user_id, "User created/updated successfully");
 
     // Generate JWT token pair
-    debug!("Generating JWT token pair");
+    trace!("Generating JWT token pair");
     let token_pair = state
         .jwt_service
         .create_token_pair(user_id)
@@ -221,7 +217,7 @@ pub async fn verify_code(
             AppError::Internal
         })?;
 
-    info!("JWT token pair created successfully");
+    debug!("JWT token pair created successfully");
 
     // Remove verification code from cache
     state.verification_code_cache.remove(&payload.email);

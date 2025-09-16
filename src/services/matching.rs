@@ -8,10 +8,10 @@ use uuid::Uuid;
 use crate::error::AppResult;
 use crate::models::{Form, Gender, TagSystem};
 use crate::utils::{
-    constant::{IDF_MIN, INCOMPATIBLE_MATCH_SCORE, MAX_PREVIEW_CANDIDATES},
+    constant::{IDF_MIN, INCOMPATIBLE_MATCH_SCORE},
     static_object::{
-        COMPLEMENTARY_TAG_WEIGHT, MATCH_PREVIEW_INTERVAL_MINUTES, TAG_SCORE_DECAY_FACTOR,
-        TRAIT_MATCH_POINTS,
+        COMPLEMENTARY_TAG_WEIGHT, MATCH_PREVIEW_INTERVAL_MINUTES, MAX_PREVIEW_CANDIDATES,
+        TAG_SCORE_DECAY_FACTOR, TRAIT_MATCH_POINTS,
     },
 };
 
@@ -284,7 +284,7 @@ impl MatchingService {
                 .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
             let (top_candidates, top_scores): (Vec<_>, Vec<_>) = candidate_scores
                 .into_iter()
-                .take(MAX_PREVIEW_CANDIDATES)
+                .take(*MAX_PREVIEW_CANDIDATES)
                 .unzip();
 
             // Store in database using UPSERT
@@ -298,7 +298,7 @@ impl MatchingService {
             );
         }
 
-        info!("Match preview generation completed");
+        debug!("Match preview generation completed");
         Ok(())
     }
 

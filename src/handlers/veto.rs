@@ -25,7 +25,7 @@ use axum::{
     response::IntoResponse,
 };
 use sqlx::PgPool;
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{debug, error, info, instrument, trace, warn};
 use uuid::Uuid;
 
 use crate::error::{AppError, AppResult};
@@ -56,10 +56,10 @@ pub async fn get_previews(
     State(state): State<Arc<AppState>>,
     Extension(user): Extension<AuthUser>,
 ) -> AppResult<Json<Vec<ProfilePreview>>> {
-    debug!("Fetching match previews for user");
+    trace!("Fetching match previews for user");
 
     let profiles = fetch_profile_previews(&state.db_pool, user.user_id).await?;
-    info!("Found {} match previews for user", profiles.len());
+    debug!("Found {} match previews for user", profiles.len());
 
     Ok(Json(profiles))
 }
@@ -190,11 +190,11 @@ pub async fn get_vetoes(
     State(state): State<Arc<AppState>>,
     Extension(user): Extension<AuthUser>,
 ) -> AppResult<Json<Vec<Uuid>>> {
-    debug!("Fetching vetoes for user");
+    trace!("Fetching vetoes for user");
 
     let vetoes = fetch_user_vetoes(&state.db_pool, user.user_id).await?;
     let vetoed_ids: Vec<Uuid> = vetoes.into_iter().map(|v| v.vetoed_id).collect();
-    info!("Found {} vetoes for user", vetoed_ids.len());
+    debug!("Found {} vetoes for user", vetoed_ids.len());
 
     Ok(Json(vetoed_ids))
 }

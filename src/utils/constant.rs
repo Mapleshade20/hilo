@@ -25,9 +25,6 @@ pub const MAX_TEXT_FIELD_LENGTH: usize = 4 * 200; // assume 4 bytes per char
 /// Maximum length for WeChat ID
 pub const MAX_WECHAT_ID_LENGTH: usize = 100;
 
-/// Maximum number of match preview candidates to store per user
-pub const MAX_PREVIEW_CANDIDATES: usize = 8;
-
 /// Score assigned to incompatible matches
 pub const INCOMPATIBLE_MATCH_SCORE: f64 = -1.0;
 
