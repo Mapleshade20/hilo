@@ -10,16 +10,16 @@ async fn test_admin_user_overview(db_pool: PgPool) {
     let test_email1 = "test1@mails.tsinghua.edu.cn";
     let test_email2 = "test2@mails.tsinghua.edu.cn";
 
-    let _user1_id = sqlx::query_scalar!(
-        r#"INSERT INTO users (email, status) VALUES ($1, 'verified') RETURNING id"#,
+    sqlx::query_scalar!(
+        r#"INSERT INTO users (email, status, wechat_id) VALUES ($1, 'verified', 'wxid1') RETURNING id"#,
         test_email1
     )
     .fetch_one(&db_pool)
     .await
     .unwrap();
 
-    let _user2_id = sqlx::query_scalar!(
-        r#"INSERT INTO users (email, status) VALUES ($1, 'form_completed') RETURNING id"#,
+    sqlx::query_scalar!(
+        r#"INSERT INTO users (email, status, wechat_id) VALUES ($1, 'form_completed', 'wxid2') RETURNING id"#,
         test_email2
     )
     .fetch_one(&db_pool)
@@ -51,6 +51,7 @@ async fn test_admin_user_overview(db_pool: PgPool) {
     assert!(user.get("id").is_some());
     assert!(user.get("email").is_some());
     assert!(user.get("status").is_some());
+    assert!(user.get("wechat_id").is_some());
 }
 
 #[sqlx::test]
