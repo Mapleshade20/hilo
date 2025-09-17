@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE FROM scheduled_final_matches\n            WHERE id = $1 AND status = 'pending'\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "72f92cf556fe4ec097dd4b2f0f329235ff3abc20e310a7dbe9d4f733391e963a"
+}

@@ -1,8 +1,7 @@
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
 
 use sqlx::PgPool;
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info, instrument, trace};
 use uuid::Uuid;
 
 use crate::error::AppResult;
@@ -313,7 +312,7 @@ impl MatchingService {
     }
 
     /// Calculate tag frequencies across all forms for IDF scoring
-    fn calculate_tag_frequencies(forms: &[Form]) -> HashMap<String, u32> {
+    pub(crate) fn calculate_tag_frequencies(forms: &[Form]) -> HashMap<String, u32> {
         let mut frequencies = HashMap::new();
 
         for form in forms {
@@ -372,7 +371,7 @@ impl MatchingService {
     }
 
     /// Build a map of vetoed_id -> set of vetoer_ids for efficient lookup
-    pub async fn build_map_vetoed_as_key(
+    pub(crate) async fn build_map_vetoed_as_key(
         db_pool: &PgPool,
     ) -> Result<HashMap<Uuid, HashSet<Uuid>>, sqlx::Error> {
         let vetoes = sqlx::query!("SELECT vetoer_id, vetoed_id FROM vetoes")
@@ -390,20 +389,30 @@ impl MatchingService {
         Ok(veto_map)
     }
 
+    /// Check if user_a has vetoed user_b
+    pub(crate) fn is_vetoed(
+        user_a: Uuid,
+        user_b: Uuid,
+        veto_map: &HashMap<Uuid, HashSet<Uuid>>,
+    ) -> bool {
+        veto_map
+            .get(&user_a)
+            .is_some_and(|vetoed_set| vetoed_set.contains(&user_b))
+    }
+
     /// Spawn the periodic preview generation task
-    pub fn spawn_preview_generation_task(db_pool: PgPool, tag_system: Arc<TagSystem>) {
+    #[instrument(skip_all)]
+    pub fn spawn_preview_generation_task(db_pool: PgPool, tag_system: &'static TagSystem) {
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(std::time::Duration::from_secs(
                 *MATCH_PREVIEW_INTERVAL_MINUTES * 60,
             ));
-
-            // First tick completes immediately, so we skip it
-            interval.tick().await;
+            interval.tick().await; // First tick completes immediately, so we skip it
 
             loop {
                 interval.tick().await;
 
-                if let Err(e) = Self::generate_match_previews(&db_pool, &tag_system).await {
+                if let Err(e) = Self::generate_match_previews(&db_pool, tag_system).await {
                     error!("Failed to generate match previews: {}", e);
                 } else {
                     info!("Match preview generation completed successfully");

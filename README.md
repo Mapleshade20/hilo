@@ -247,6 +247,9 @@ _All protected endpoints require valid JWT Bearer token in Authorization header_
   - Returns `200 OK` with a list of UUIDs of casted vetoes
   - Response: `["3bc5b542-36f2-41d8-8c63-f252f0eb438c", "47c361f7-d828-4015-892d-bd842bd5b7d7"]`
 
+- `GET /api/final-match/time` - Get next scheduled final match time
+  - Response: `{"next": null}` or `{"next": "2025-09-17T13:00:59Z"}`
+
 - `POST /api/final-match/accept`, `POST /api/final-match/reject` - Decide on final match
   - Returns `200 OK` with updated profile
   - Response: refer to `GET /api/profile`
@@ -266,8 +269,8 @@ _Admin endpoints run on separate port (configured via `ADMIN_ADDRESS`)_
 
 #### User Management
 
-- `GET /api/admin/users` - Get paginated users overview
-  - JSON request body:
+- `GET /api/admin/users?...` - Get paginated users overview
+  - Query Params: (optional)
     - `page` (default: 1) - Page number
     - `limit` (default: 20, max: 100) - Items per page
     - `status` (default: null, accpetable: `unverified`|`verification_pending`|`verified`|`form_completed`|`matched`|`confirmed`) - Filter a specific status
@@ -378,10 +381,10 @@ _Admin endpoints run on separate port (configured via `ADMIN_ADDRESS`)_
 
 - `POST /api/admin/update-previews` - Regenerate match previews
   - Response: `{"success": true, "message": "Match previews updated successfully"}`
-- `POST /api/admin/trigger-match` - Execute final matching algorithm
+- `POST /api/admin/trigger-match` - Manually execute final matching immediately (normally won't be used)
   - Response: `{"success": true, "message": "Final matching completed successfully", "matches_created": 0}`
-- `GET /api/admin/matches` - View all final matches
-  - Query Parameters:
+- `GET /api/admin/matches?...` - View all final matches
+  - Query Parameters: (optional)
     - `page` (default: 1) - Page number
     - `limit` (default: 20, max: 100) - Items per page
   - Response:
@@ -414,6 +417,53 @@ _Admin endpoints run on separate port (configured via `ADMIN_ADDRESS`)_
     }
   }
   ```
+
+- `GET /api/admin/scheduled-matches` - View scheduled final matches
+  - Response:
+
+  ```json
+  [
+    {
+      "id": "6234b8f4-01df-4ec7-b7b8-67dc328c216c",
+      "scheduled_time": "2025-09-17T13:00:59Z",
+      "status": "Completed",
+      "created_at": "2025-09-17T12:41:55.612615Z",
+      "executed_at": "2025-09-17T13:01:55.445273Z",
+      "matches_created": 0,
+      "error_message": null
+    },
+    {
+      "id": "7ec36949-51a2-4352-812e-f9bec48877dc",
+      "scheduled_time": "2025-09-18T20:00:00Z",
+      "status": "Pending",
+      "created_at": "2025-09-17T12:41:55.614084Z",
+      "executed_at": null,
+      "matches_created": null,
+      "error_message": null
+    }
+  ]
+  ```
+
+- `POST /api/admin/scheduled-matches` - Schedule a final match
+  - JSON request body: `{"scheduled_times": [{"scheduled_time": "2025-09-17T13:00:59Z"}]}`
+  - 201 Created with Response:
+
+  ```json
+  [
+    {
+      "id": "6234b8f4-01df-4ec7-b7b8-67dc328c216c",
+      "scheduled_time": "2025-09-17T13:00:59Z",
+      "status": "Pending",
+      "created_at": "2025-09-17T12:41:55.612615Z",
+      "executed_at": null,
+      "matches_created": null,
+      "error_message": null
+    }
+  ]
+  ```
+
+- `DELETE /api/admin/scheduled-matches/{id}` - Cancel a scheduled final match
+  - Returns 200 OK
 
 </details>
 

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    UPDATE scheduled_final_matches\n                    SET status = 'completed', matches_created = $1\n                    WHERE id = $2\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "272dccbe5493d5e8b7c66a3aa912d8cc3bd0a21c5601552a07eb29ad7bcc6c0e"
+}

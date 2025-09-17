@@ -169,7 +169,7 @@ pub async fn get_users_overview(
         },
     };
 
-    Ok((StatusCode::OK, Json(response)))
+    Ok(Json(response))
 }
 
 /// Serves student card photos for admin review.
@@ -339,7 +339,7 @@ pub async fn get_user_detail(
         form: form_info,
     };
 
-    Ok((StatusCode::OK, Json(response)).into_response())
+    Ok(Json(response))
 }
 
 /// Gets the tag system structure with usage statistics.
@@ -378,7 +378,7 @@ pub async fn get_tags_with_stats(
     // Convert tag nodes to stats format
     let tags_with_stats = convert_tags_to_stats(&TAG_TREE, &tag_frequencies, total_user_count);
 
-    Ok((StatusCode::OK, Json(tags_with_stats)).into_response())
+    Ok(Json(tags_with_stats))
 }
 
 /// Final match overview item
@@ -456,19 +456,15 @@ pub async fn get_final_matches(
 
     let total_pages = total.div_ceil(limit);
 
-    Ok((
-        StatusCode::OK,
-        Json(PaginatedResponse {
-            data: match_overviews,
-            pagination: PaginationInfo {
-                page,
-                limit,
-                total,
-                total_pages,
-            },
-        }),
-    )
-        .into_response())
+    Ok(Json(PaginatedResponse {
+        data: match_overviews,
+        pagination: PaginationInfo {
+            page,
+            limit,
+            total,
+            total_pages,
+        },
+    }))
 }
 
 /// User statistics response
@@ -559,5 +555,5 @@ pub async fn get_user_stats(State(state): State<Arc<AdminState>>) -> AppResult<i
         unmatched_females,
     };
 
-    Ok((StatusCode::OK, Json(response)).into_response())
+    Ok(Json(response))
 }

@@ -6,7 +6,9 @@ mod user_status;
 
 pub use form::{Form, Gender};
 pub use matching::{
-    FinalMatch, FinalPartnerProfile, MatchPreview, ProfilePreview, Veto, VetoRequest,
+    CreateScheduledMatchRequest, CreateScheduledMatchesRequest, FinalMatch, FinalPartnerProfile,
+    MatchPreview, NextMatchTimeResponse, ProfilePreview, ScheduleStatus, ScheduledFinalMatch, Veto,
+    VetoRequest,
 };
 pub use state::AppState;
 pub use tag::{TagNode, TagSystem};
