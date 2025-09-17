@@ -119,6 +119,9 @@ pub fn app_with_email_service(db_pool: PgPool, email_service: Arc<dyn EmailServi
     // Spawn the scheduler background task
     SchedulerService::spawn_scheduler_task(state.db_pool.clone(), &TAG_SYSTEM);
 
+    // Spawn the auto-accept background task
+    SchedulerService::spawn_auto_accept_task(state.db_pool.clone());
+
     let protected_routes = Router::new()
         .route("/api/profile", get(get_profile))
         .route("/api/form", post(submit_form))

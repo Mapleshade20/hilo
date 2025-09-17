@@ -1,16 +1,16 @@
 use std::collections::{HashMap, HashSet};
 
 use sqlx::PgPool;
-use tracing::{debug, error, info, instrument, trace};
+use tracing::{debug, instrument, trace};
 use uuid::Uuid;
 
 use crate::error::AppResult;
 use crate::models::{Form, Gender, TagSystem};
 use crate::utils::{
-    constant::{IDF_MIN, INCOMPATIBLE_MATCH_SCORE},
+    constant::{IDF_MIN, INCOMPATIBLE_MATCH_SCORE, MATCH_PREVIEW_INTERVAL},
     static_object::{
-        COMPLEMENTARY_TAG_WEIGHT, MATCH_PREVIEW_INTERVAL_MINUTES, MAX_PREVIEW_CANDIDATES,
-        TAG_SCORE_DECAY_FACTOR, TRAIT_MATCH_POINTS,
+        COMPLEMENTARY_TAG_WEIGHT, MAX_PREVIEW_CANDIDATES, TAG_SCORE_DECAY_FACTOR,
+        TRAIT_MATCH_POINTS,
     },
 };
 
@@ -26,7 +26,7 @@ impl MatchingService {
         tag_frequencies: &HashMap<String, u32>,
         total_user_count: u32,
     ) -> f64 {
-        // 1.1 Hard Filters (Dealbreakers)
+        // Hard Filters (Dealbreakers)
 
         // Gender Filter: Must be one male and one female
         if !Self::is_gender_compatible(form_a.gender, form_b.gender) {
@@ -44,7 +44,7 @@ impl MatchingService {
             return INCOMPATIBLE_MATCH_SCORE;
         }
 
-        // 1.2 Scored Components (Points-based)
+        // Scored Components (Points-based)
         let mut score = 0.0;
 
         // A. Hierarchical Tag Scoring (Most Important Component)
@@ -86,8 +86,8 @@ impl MatchingService {
         }
 
         trace!(
-            "Match score between users {} and {}: {}",
-            form_a.user_id, form_b.user_id, score
+            user_a = %form_a.user_id, user_b = %form_b.user_id,
+            "Match score calculated: {}", score
         );
 
         score
@@ -237,15 +237,14 @@ impl MatchingService {
     }
 
     /// Generate match previews for all users and store them in the database
+    #[instrument(skip_all, err)]
     pub async fn generate_match_previews(
         db_pool: &PgPool,
         tag_system: &TagSystem,
     ) -> AppResult<()> {
-        debug!("Starting match preview generation");
-
         let forms = Self::fetch_unmatched_forms(db_pool).await?;
         if forms.is_empty() {
-            info!("No forms found, skipping match preview generation");
+            debug!("No forms found, skipping match preview generation");
             return Ok(());
         }
 
@@ -255,8 +254,6 @@ impl MatchingService {
         // Calculate tag frequencies for IDF scoring
         let tag_frequencies = Self::calculate_tag_frequencies(&forms);
         let total_user_count = forms.len() as u32;
-
-        info!("Generating previews for {} users", total_user_count);
 
         // Generate previews for each user
         for (i, user_form) in forms.iter().enumerate() {
@@ -307,7 +304,7 @@ impl MatchingService {
             );
         }
 
-        debug!("Match preview generation completed");
+        debug!(user_count = %total_user_count, "Preview generation completed");
         Ok(())
     }
 
@@ -401,22 +398,14 @@ impl MatchingService {
     }
 
     /// Spawn the periodic preview generation task
-    #[instrument(skip_all)]
     pub fn spawn_preview_generation_task(db_pool: PgPool, tag_system: &'static TagSystem) {
         tokio::spawn(async move {
-            let mut interval = tokio::time::interval(std::time::Duration::from_secs(
-                *MATCH_PREVIEW_INTERVAL_MINUTES * 60,
-            ));
+            let mut interval = tokio::time::interval(MATCH_PREVIEW_INTERVAL);
             interval.tick().await; // First tick completes immediately, so we skip it
 
             loop {
                 interval.tick().await;
-
-                if let Err(e) = Self::generate_match_previews(&db_pool, tag_system).await {
-                    error!("Failed to generate match previews: {}", e);
-                } else {
-                    info!("Match preview generation completed successfully");
-                }
+                let _ = Self::generate_match_previews(&db_pool, tag_system).await;
             }
         });
     }

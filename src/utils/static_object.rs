@@ -139,16 +139,6 @@ pub static TRAITS_LIMIT_EACH: LazyLock<usize> = LazyLock::new(|| {
         })
 });
 
-pub static MATCH_PREVIEW_INTERVAL_MINUTES: LazyLock<u64> = LazyLock::new(|| {
-    env::var("MATCH_PREVIEW_INTERVAL_MINUTES")
-        .ok()
-        .and_then(|val| val.parse().ok())
-        .unwrap_or_else(|| {
-            error!("Invalid or missing MATCH_PREVIEW_INTERVAL_MINUTES env var, using fallback 20");
-            20
-        })
-});
-
 pub static MAX_PREVIEW_CANDIDATES: LazyLock<usize> = LazyLock::new(|| {
     env::var("MAX_PREVIEW_CANDIDATES")
         .ok()

@@ -19,8 +19,6 @@ mod admin;
 mod auth;
 mod final_match;
 mod form;
-mod health_check;
-mod next_match_time;
 mod partner_image;
 mod profile;
 mod upload_card;
@@ -31,10 +29,20 @@ pub use admin::admin_router;
 pub use auth::*;
 pub use final_match::*;
 pub use form::*;
-pub use health_check::*;
-pub use next_match_time::*;
 pub use partner_image::*;
 pub use profile::*;
 pub use upload_card::*;
 pub use upload_profile_photo::*;
 pub use veto::*;
+
+use axum::http::StatusCode;
+use tracing::{instrument, trace};
+
+/// Health check endpoint that returns 200 OK.
+///
+/// GET /health-check
+#[instrument]
+pub async fn health_check() -> StatusCode {
+    trace!("Health check endpoint accessed");
+    StatusCode::OK
+}

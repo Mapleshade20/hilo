@@ -65,15 +65,17 @@ Veto means rejection.
 
 ### Part IV. Final Matching & Results
 
-1. **Admin Trigger**: Administrators initiate the final matching process:
+1. **Admin Schedule**: Administrators can schedule final matches or manually trigger the final matching process:
+   - A final match will be automatically executed at each scheduled timestamp. Users can use API to get the next timestamp.
    - Only users with `form_completed` status are included, after this their status becomes updated to `matched` (unless unmatched)
    - Vetoes are considered to exclude incompatible pairs
    - Algorithm: **Greedy**
 
 2. **Match Results**: Users receive their final match information and decide if their accept it:
    - Displayed info: `familiar_tags`, `aspirational_tags`, `self_intro`, `email_domain`, `grade`, profile photo (if any)
-   - Once both users accepted the match, `wechat_id` is displayed, and status becomes `confirmed`
-   - A rejection from either side will revert both users' status to `form_completed`. Admin can trigger new final matching after a period of time, and only unmatched users will be included in this round.
+   - A user's status becomes `confirmed` when they accept the match. Once both users accepted the match, `wechat_id` is displayed.
+   - Matches that are not rejected or mutually confirmed will be auto-confirmed 24 hours after its creation.
+   - A rejection from either side will revert both users' status to `form_completed`. They will participate in the next round of final match.
 
 ## API Documentation
 
@@ -556,7 +558,7 @@ Configure environment variables in `podman-compose.yml`. For their meanings refe
 
 1. **ID Card Verification**: Review uploaded ID cards via admin interface
 2. **Status Updates**: Change user status from `verification_pending` to `verified`
-3. **Match Generation**: Trigger final matching when ready
+3. **Match Generation**: Schedule a few final matches in advance
 4. **System Monitoring**: Monitor user statistics and system health
 
 ## Development
