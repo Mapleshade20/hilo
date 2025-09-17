@@ -30,3 +30,6 @@ pub const INCOMPATIBLE_MATCH_SCORE: f64 = -1.0;
 
 /// Minimum IDF value to avoid division by zero or overly aggressive down-weighting
 pub const IDF_MIN: f64 = 0.1;
+
+/// Interval to check for scheduled matches
+pub const CHECK_SCHEDULED_MATCH_INTERVAL: Duration = Duration::from_secs(60);

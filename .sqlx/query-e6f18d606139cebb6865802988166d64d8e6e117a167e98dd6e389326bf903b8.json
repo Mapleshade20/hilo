@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    UPDATE scheduled_final_matches\n                    SET status = 'failed', error_message = $1\n                    WHERE id = $2\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e6f18d606139cebb6865802988166d64d8e6e117a167e98dd6e389326bf903b8"
+}

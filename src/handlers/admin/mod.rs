@@ -27,12 +27,11 @@
 mod action;
 mod view;
 
-use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use axum::{
     Router,
-    routing::{get, post},
+    routing::{delete, get, post},
 };
 use serde::Serialize;
 use sqlx::PgPool;
@@ -40,9 +39,12 @@ use tracing::warn;
 use uuid::Uuid;
 
 use crate::error::{AppError, AppResult};
-use crate::models::{FinalMatch, Form, TagNode, TagSystem, UserStatus};
+use crate::models::{TagNode, TagSystem, UserStatus};
 use crate::utils::static_object::TAG_SYSTEM;
-use action::{trigger_final_matching, update_match_previews, verify_user};
+use action::{
+    cancel_scheduled_match, create_scheduled_matches, get_scheduled_matches,
+    trigger_final_matching, update_match_previews, verify_user,
+};
 use view::{
     get_final_matches, get_tags_with_stats, get_user_detail, get_user_stats, get_users_overview,
     serve_user_card_photo,
@@ -64,6 +66,15 @@ pub fn admin_router(db_pool: PgPool) -> Router {
         .route("/api/admin/trigger-match", post(trigger_final_matching))
         .route("/api/admin/update-previews", post(update_match_previews))
         .route("/api/admin/verify-user", post(verify_user))
+        .route(
+            "/api/admin/scheduled-matches",
+            post(create_scheduled_matches),
+        )
+        .route("/api/admin/scheduled-matches", get(get_scheduled_matches))
+        .route(
+            "/api/admin/scheduled-matches/{id}",
+            delete(cancel_scheduled_match),
+        )
         .route("/api/admin/users", get(get_users_overview))
         .route("/api/admin/card/{filename}", get(serve_user_card_photo))
         .route("/api/admin/user", get(get_user_detail))
@@ -71,22 +82,6 @@ pub fn admin_router(db_pool: PgPool) -> Router {
         .route("/api/admin/matches", get(get_final_matches))
         .route("/api/admin/stats", get(get_user_stats))
         .with_state(state)
-}
-
-/// Calculate tag frequencies for IDF scoring - same as in preview generation
-fn calculate_tag_frequencies(forms: &[Form]) -> HashMap<String, u32> {
-    let mut frequencies = HashMap::new();
-
-    for form in forms {
-        for tag in &form.familiar_tags {
-            *frequencies.entry(tag.clone()).or_insert(0) += 1;
-        }
-        for tag in &form.aspirational_tags {
-            *frequencies.entry(tag.clone()).or_insert(0) += 1;
-        }
-    }
-
-    frequencies
 }
 
 /// Get user ID by email
@@ -163,39 +158,4 @@ fn convert_tags_to_stats(
             }
         })
         .collect()
-}
-
-/// Check if user_a has vetoed user_b
-fn is_vetoed(user_a: Uuid, user_b: Uuid, veto_map: &HashMap<Uuid, HashSet<Uuid>>) -> bool {
-    veto_map
-        .get(&user_a)
-        .is_some_and(|vetoed_set| vetoed_set.contains(&user_b))
-}
-
-async fn create_final_match(
-    db_pool: &PgPool,
-    user_a_id: Uuid,
-    user_b_id: Uuid,
-    score: f64,
-) -> Result<FinalMatch, sqlx::Error> {
-    // Ensure consistent ordering: smaller UUID first
-    let (first_user, second_user) = if user_a_id < user_b_id {
-        (user_a_id, user_b_id)
-    } else {
-        (user_b_id, user_a_id)
-    };
-
-    sqlx::query_as!(
-        FinalMatch,
-        r#"
-        INSERT INTO final_matches (user_a_id, user_b_id, score)
-        VALUES ($1, $2, $3)
-        RETURNING id, user_a_id, user_b_id, score
-        "#,
-        first_user,
-        second_user,
-        score
-    )
-    .fetch_one(db_pool)
-    .await
 }

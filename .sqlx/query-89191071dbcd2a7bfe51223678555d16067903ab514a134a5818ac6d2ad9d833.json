@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT scheduled_time\n            FROM scheduled_final_matches\n            WHERE status = 'pending'\n            ORDER BY scheduled_time ASC\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "scheduled_time",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "89191071dbcd2a7bfe51223678555d16067903ab514a134a5818ac6d2ad9d833"
+}

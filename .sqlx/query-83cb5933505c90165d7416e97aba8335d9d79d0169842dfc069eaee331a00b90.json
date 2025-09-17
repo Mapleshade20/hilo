@@ -1,0 +1,67 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id, scheduled_time, status as \"status: ScheduleStatus\",\n                   created_at, executed_at, matches_created, error_message\n            FROM scheduled_final_matches\n            ORDER BY scheduled_time ASC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "scheduled_time",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 2,
+        "name": "status: ScheduleStatus",
+        "type_info": {
+          "Custom": {
+            "name": "schedule_status",
+            "kind": {
+              "Enum": [
+                "pending",
+                "completed",
+                "failed"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "executed_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "matches_created",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "error_message",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "83cb5933505c90165d7416e97aba8335d9d79d0169842dfc069eaee331a00b90"
+}

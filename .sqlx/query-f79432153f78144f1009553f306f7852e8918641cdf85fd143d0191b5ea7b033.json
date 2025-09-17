@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE scheduled_final_matches\n            SET executed_at = $1\n            WHERE id = $2 AND status = 'pending'\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f79432153f78144f1009553f306f7852e8918641cdf85fd143d0191b5ea7b033"
+}

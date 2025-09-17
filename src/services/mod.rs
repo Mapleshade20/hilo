@@ -9,7 +9,9 @@
 //! - **Email** (`email`) - Email delivery service with multiple implementations
 //! - **JWT** (`jwt`) - JSON Web Token creation, validation, and management
 //! - **Matching** (`matching`) - User compatibility scoring and matching algorithms
+//! - **Scheduler** (`scheduler`) - Scheduled final match execution service
 
 pub mod email;
 pub mod jwt;
 pub mod matching;
+pub mod scheduler;

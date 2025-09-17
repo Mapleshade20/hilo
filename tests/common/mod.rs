@@ -176,7 +176,7 @@ pub fn extract_verification_code(email_body: &str) -> &str {
 pub async fn get_access_token(
     client: &reqwest::Client,
     address: &str,
-    mock_emailer: &Arc<MockEmailer>,
+    mock_emailer: &MockEmailer,
     email_addr: &str,
 ) -> String {
     mock_emailer.clear();
@@ -437,7 +437,7 @@ pub async fn access_partner_image(
 pub async fn setup_two_matched_users(
     client: &reqwest::Client,
     address: &str,
-    mock_emailer: &Arc<MockEmailer>,
+    mock_emailer: &MockEmailer,
 ) -> (String, String) {
     let male_email = "male@mails.tsinghua.edu.cn";
     let female_email = "female@mails.tsinghua.edu.cn";

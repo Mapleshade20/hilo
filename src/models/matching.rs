@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
+use time::OffsetDateTime;
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
@@ -54,4 +55,43 @@ pub struct FinalPartnerProfile {
     pub photo_url: Option<String>,
     /// WeChat ID is included only if both users have accepted the match
     pub wechat_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "schedule_status", rename_all = "lowercase")]
+pub enum ScheduleStatus {
+    Pending,
+    Completed,
+    Failed,
+}
+
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct ScheduledFinalMatch {
+    pub id: Uuid,
+    #[serde(with = "time::serde::rfc3339")]
+    pub scheduled_time: OffsetDateTime,
+    pub status: ScheduleStatus,
+    #[serde(with = "time::serde::rfc3339")]
+    pub created_at: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339::option")]
+    pub executed_at: Option<OffsetDateTime>,
+    pub matches_created: Option<i32>,
+    pub error_message: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateScheduledMatchRequest {
+    #[serde(with = "time::serde::rfc3339")]
+    pub scheduled_time: OffsetDateTime,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateScheduledMatchesRequest {
+    pub scheduled_times: Vec<CreateScheduledMatchRequest>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NextMatchTimeResponse {
+    #[serde(with = "time::serde::rfc3339::option")]
+    pub next: Option<OffsetDateTime>,
 }

@@ -15,22 +15,22 @@
 //! - **Match Previews** - Regenerates preview suggestions for all users
 //! - **User Verification** - Changes user status for verification workflow
 
-use std::collections::HashSet;
 use std::sync::Arc;
 
-use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
+use axum::{
+    Json,
+    extract::{Path as AxumPath, State},
+    http::StatusCode,
+    response::IntoResponse,
+};
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
 use tracing::{error, info, instrument, warn};
 use uuid::Uuid;
 
-use super::{
-    AdminState, calculate_tag_frequencies, create_final_match, get_user_id_by_email,
-    get_user_status, is_vetoed,
-};
+use super::{AdminState, get_user_id_by_email, get_user_status};
 use crate::error::{AppError, AppResult};
-use crate::models::{TagSystem, UserStatus};
-use crate::services::matching::MatchingService;
+use crate::models::{CreateScheduledMatchesRequest, UserStatus};
+use crate::services::{matching::MatchingService, scheduler::SchedulerService};
 
 #[derive(Debug, Serialize)]
 pub struct TriggerMatchingResponse {
@@ -62,7 +62,7 @@ pub struct ActionResponse {
 pub async fn trigger_final_matching(
     State(state): State<Arc<AdminState>>,
 ) -> AppResult<impl IntoResponse> {
-    let matches_len = execute_final_matching(&state.db_pool, state.tag_system)
+    let matches_len = SchedulerService::execute_final_matching(&state.db_pool, state.tag_system)
         .await
         .map_err(|e| {
             error!("Final matching failed: {}", e);
@@ -70,108 +70,11 @@ pub async fn trigger_final_matching(
         })?;
 
     info!("Final matching completed: {} pairs", matches_len);
-    Ok((
-        StatusCode::OK,
-        Json(TriggerMatchingResponse {
-            success: true,
-            message: "Final matching completed successfully",
-            matches_created: matches_len,
-        }),
-    )
-        .into_response())
-}
-
-/// Execute the final matching algorithm using greedy approach
-///
-/// Ok value is the number of matches created
-async fn execute_final_matching(db_pool: &PgPool, tag_system: &TagSystem) -> AppResult<usize> {
-    // Fetch all users with submitted forms
-    let forms = MatchingService::fetch_unmatched_forms(db_pool).await?;
-    if forms.is_empty() {
-        return Ok(0);
-    }
-
-    // Fetch all veto records
-    let veto_map = MatchingService::build_map_vetoed_as_key(db_pool).await?;
-
-    // Calculate tag frequencies for IDF scoring
-    let tag_frequencies = calculate_tag_frequencies(&forms);
-    let total_user_count = forms.len() as u32;
-
-    // Build score matrix for all valid pairs
-    let mut pair_scores = Vec::new();
-
-    for (i, form_a) in forms.iter().enumerate() {
-        for (j, form_b) in forms.iter().enumerate() {
-            if i >= j {
-                continue; // Only consider each pair once
-            }
-
-            let score = MatchingService::calculate_match_score(
-                form_a,
-                form_b,
-                tag_system,
-                &tag_frequencies,
-                total_user_count,
-            );
-
-            // Apply vetoes - if either user has vetoed the other, set score to -1
-            if is_vetoed(form_a.user_id, form_b.user_id, &veto_map)
-                || is_vetoed(form_b.user_id, form_a.user_id, &veto_map)
-            {
-                continue; // Skip vetoed pairs entirely
-            }
-
-            if score > 0.0 {
-                pair_scores.push((form_a.user_id, form_b.user_id, score));
-            }
-        }
-    }
-
-    // Sort by score (descending) for greedy algorithm
-    // TODO: consider using better algorithm like Hungarian for optimal matching
-    pair_scores.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
-
-    // Greedy matching algorithm
-    let mut matched_users = HashSet::new();
-    let mut final_matches = Vec::new();
-
-    for (user_a, user_b, score) in pair_scores {
-        if !matched_users.contains(&user_a) && !matched_users.contains(&user_b) {
-            // Create the final match
-            let final_match = create_final_match(db_pool, user_a, user_b, score).await?;
-            final_matches.push(final_match);
-
-            matched_users.insert(user_a);
-            matched_users.insert(user_b);
-        }
-    }
-
-    // Update status of matched users to 'matched'
-    for final_match in &final_matches {
-        sqlx::query!(
-            r#"UPDATE users SET status = 'matched' WHERE id = $1"#,
-            final_match.user_a_id
-        )
-        .execute(db_pool)
-        .await?;
-
-        sqlx::query!(
-            r#"UPDATE users SET status = 'matched' WHERE id = $1"#,
-            final_match.user_b_id
-        )
-        .execute(db_pool)
-        .await?;
-    }
-
-    // Clear all vetoes and previews after final matching
-    info!("Clearing all vetoes and match previews");
-    sqlx::query!("DELETE FROM vetoes").execute(db_pool).await?;
-    sqlx::query!("DELETE FROM match_previews")
-        .execute(db_pool)
-        .await?;
-
-    Ok(final_matches.len())
+    Ok(Json(TriggerMatchingResponse {
+        success: true,
+        message: "Final matching completed successfully",
+        matches_created: matches_len,
+    }))
 }
 
 /// Manually regenerates match previews for all eligible users.
@@ -198,14 +101,10 @@ pub async fn update_match_previews(
         })?;
 
     info!("Match previews update completed successfully");
-    Ok((
-        StatusCode::OK,
-        Json(ActionResponse {
-            success: true,
-            message: "Match previews updated successfully",
-        }),
-    )
-        .into_response())
+    Ok(Json(ActionResponse {
+        success: true,
+        message: "Match previews updated successfully",
+    }))
 }
 
 /// Request payload for admin user verification
@@ -297,15 +196,105 @@ pub async fn verify_user(
         current_status, payload.status
     );
 
-    Ok((
-        StatusCode::OK,
-        Json(UserData {
-            user_id: updated_user.id,
-            email: updated_user.email,
-            status: updated_user.status,
-            grade: updated_user.grade,
-            card_photo_filename: updated_user.card_photo_filename,
-        }),
-    )
-        .into_response())
+    Ok(Json(UserData {
+        user_id: updated_user.id,
+        email: updated_user.email,
+        status: updated_user.status,
+        grade: updated_user.grade,
+        card_photo_filename: updated_user.card_photo_filename,
+    }))
+}
+
+/// Creates multiple scheduled final match triggers.
+///
+/// POST /api/admin/scheduled-matches CreateScheduledMatchesRequest
+///
+/// This endpoint allows administrators to schedule automatic final match
+/// executions at specified UTC timestamps. The scheduled matches will be
+/// executed automatically by the background scheduler service.
+///
+/// # Returns
+///
+/// - `201 Created` with `Vec<ScheduledFinalMatch>` - Scheduled matches created successfully
+/// - `400 Bad Request` - Invalid timestamps or timestamps in the past
+/// - `500 Internal Server Error` - Database error
+#[instrument(skip_all, fields(request_id = %uuid::Uuid::new_v4()))]
+pub async fn create_scheduled_matches(
+    State(state): State<Arc<AdminState>>,
+    Json(payload): Json<CreateScheduledMatchesRequest>,
+) -> AppResult<impl IntoResponse> {
+    if payload.scheduled_times.is_empty() {
+        return Err(AppError::BadRequest(
+            "At least one scheduled time is required",
+        ));
+    }
+
+    let scheduled_times: Vec<_> = payload
+        .scheduled_times
+        .into_iter()
+        .map(|req| req.scheduled_time)
+        .collect();
+
+    let scheduled_matches =
+        SchedulerService::create_scheduled_matches(&state.db_pool, &scheduled_times).await?;
+
+    info!(
+        "Created {} scheduled final matches",
+        scheduled_matches.len()
+    );
+
+    Ok((StatusCode::CREATED, Json(scheduled_matches)))
+}
+
+/// Gets all scheduled final match triggers.
+///
+/// GET /api/admin/scheduled-matches
+///
+/// This endpoint returns all scheduled final match triggers, including
+/// pending, completed, and failed ones, ordered by scheduled time.
+///
+/// # Returns
+///
+/// - `200 OK` with `Vec<ScheduledFinalMatch>` - All scheduled matches
+/// - `500 Internal Server Error` - Database error
+#[instrument(skip_all, fields(request_id = %uuid::Uuid::new_v4()))]
+pub async fn get_scheduled_matches(
+    State(state): State<Arc<AdminState>>,
+) -> AppResult<impl IntoResponse> {
+    let scheduled_matches = SchedulerService::get_all_scheduled_matches(&state.db_pool).await?;
+
+    Ok(Json(scheduled_matches))
+}
+
+/// Cancels a scheduled final match trigger.
+///
+/// DELETE /api/admin/scheduled-matches/{id}
+///
+/// This endpoint cancels (deletes) a pending scheduled final match.
+/// Only pending matches can be cancelled.
+///
+/// # Returns
+///
+/// - `200 OK` with `ActionResponse` - Match cancelled successfully
+/// - `404 Not Found` - Match not found or already executed
+/// - `500 Internal Server Error` - Database error
+#[instrument(skip_all, fields(request_id = %uuid::Uuid::new_v4(), match_id = %match_id))]
+pub async fn cancel_scheduled_match(
+    State(state): State<Arc<AdminState>>,
+    AxumPath(match_id): AxumPath<Uuid>,
+) -> AppResult<impl IntoResponse> {
+    let cancelled = SchedulerService::cancel_scheduled_match(&state.db_pool, match_id).await?;
+
+    if !cancelled {
+        return Err(AppError::NotFound(
+            "Scheduled match not found or already executed",
+        ));
+    }
+
+    info!(%match_id, "Cancelled scheduled final match");
+
+    Ok(Json(ActionResponse {
+        success: true,
+        message: "Scheduled match cancelled successfully",
+    }))
 }
