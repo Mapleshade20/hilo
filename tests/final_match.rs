@@ -61,6 +61,10 @@ async fn test_view_profiles(
         "Should have partner aspirational tags"
     );
     assert!(
+        final_match["recent_topics"].is_string(),
+        "Should have partner recent topics"
+    );
+    assert!(
         final_match["self_intro"].is_string(),
         "Should have partner self intro"
     );

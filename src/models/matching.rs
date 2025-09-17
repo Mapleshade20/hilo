@@ -50,6 +50,7 @@ pub struct FinalPartnerProfile {
     pub grade: Option<String>,
     pub familiar_tags: Vec<String>,
     pub aspirational_tags: Vec<String>,
+    pub recent_topics: String,
     pub self_intro: String,
     /// Format: /api/images/partner/someuuid.ext
     pub photo_url: Option<String>,

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            u.email,\n            u.grade,\n            u.status as \"status: UserStatus\",\n            u.wechat_id,\n            f.familiar_tags,\n            f.aspirational_tags,\n            f.self_intro,\n            f.profile_photo_filename\n        FROM users u\n        LEFT JOIN forms f ON u.id = f.user_id\n        WHERE u.id = $1\n        ",
+  "query": "\n        SELECT\n            u.email,\n            u.grade,\n            u.status as \"status: UserStatus\",\n            u.wechat_id,\n            f.familiar_tags,\n            f.aspirational_tags,\n            f.recent_topics,\n            f.self_intro,\n            f.profile_photo_filename\n        FROM users u\n        LEFT JOIN forms f ON u.id = f.user_id\n        WHERE u.id = $1\n        ",
   "describe": {
     "columns": [
       {
@@ -49,11 +49,16 @@
       },
       {
         "ordinal": 6,
-        "name": "self_intro",
+        "name": "recent_topics",
         "type_info": "Text"
       },
       {
         "ordinal": 7,
+        "name": "self_intro",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
         "name": "profile_photo_filename",
         "type_info": "Varchar"
       }
@@ -71,8 +76,9 @@
       false,
       false,
       false,
+      false,
       true
     ]
   },
-  "hash": "4703d44289e1e198f3914095bc256257622cbcb5ec3b8f32e244989d8f63cb30"
+  "hash": "a4a90e450a7eedeb03c0c769b3338da4ef6d149d93c1a9ee73abd611f0c43d29"
 }

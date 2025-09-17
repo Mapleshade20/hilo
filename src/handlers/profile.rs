@@ -128,6 +128,7 @@ async fn fetch_partner_profile(
             u.wechat_id,
             f.familiar_tags,
             f.aspirational_tags,
+            f.recent_topics,
             f.self_intro,
             f.profile_photo_filename
         FROM users u
@@ -165,6 +166,7 @@ async fn fetch_partner_profile(
         grade: partner_info.grade,
         familiar_tags: partner_info.familiar_tags,
         aspirational_tags: partner_info.aspirational_tags,
+        recent_topics: partner_info.recent_topics,
         self_intro: partner_info.self_intro,
         photo_url,
         wechat_id,
