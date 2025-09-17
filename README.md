@@ -72,7 +72,7 @@ Veto means rejection.
    - Algorithm: **Greedy**
 
 2. **Match Results**: Users receive their final match information and decide if their accept it:
-   - Displayed info: `familiar_tags`, `aspirational_tags`, `self_intro`, `email_domain`, `grade`, profile photo (if any)
+   - Displayed info: `familiar_tags`, `aspirational_tags`, `recent_topics`, `self_intro`, `email_domain`, `grade`, profile photo (if any)
    - A user's status becomes `confirmed` when they accept the match. Once both users accepted the match, `wechat_id` is displayed.
    - Matches that are not rejected or mutually confirmed will be auto-confirmed 24 hours after its creation.
    - A rejection from either side will revert both users' status to `form_completed`. They will participate in the next round of final match.
@@ -128,7 +128,7 @@ _All protected endpoints require valid JWT Bearer token in Authorization header_
 
 #### Profile Management
 
-- `GET /api/profile` - Get current user profile information
+- `GET /api/profile` - Get current user profile with their final match partner information if any
   - If the user doesn't have a final match partner, the final result field will be null; wechat_id becomes not null once both sides have accepted the result
 
   ```json
@@ -141,6 +141,7 @@ _All protected endpoints require valid JWT Bearer token in Authorization header_
       "grade": "undergraduate",
       "familiar_tags": ["pc_fps", "spanish"],
       "aspirational_tags": ["volleyball", "creative_games"],
+      "recent_topics": "I've been reading Harry Potter",
       "self_intro": "Hello world",
       "photo_url": "/api/images/partner/91f4cf07-b2b4-4c05-a31e-9ed524c936ee.jpg",
       "wechat_id": null
