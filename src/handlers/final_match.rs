@@ -6,15 +6,17 @@
 use std::sync::Arc;
 
 use axum::{
+    Json,
     extract::{Extension, State},
     response::IntoResponse,
 };
-use tracing::{info, instrument, warn};
+use tracing::{error, info, instrument, warn};
 
 use crate::error::{AppError, AppResult};
 use crate::handlers::get_profile;
 use crate::middleware::AuthUser;
-use crate::models::{AppState, UserStatus};
+use crate::models::{AppState, NextMatchTimeResponse, UserStatus};
+use crate::services::scheduler::SchedulerService;
 
 /// Accepts a final match result for the authenticated user.
 ///
@@ -50,13 +52,17 @@ pub async fn accept_final_match(
     }
 
     // Update user status to 'confirmed'
-    sqlx::query!(
-        "UPDATE users SET status = 'confirmed' WHERE id = $1",
+    let result = sqlx::query!(
+        "UPDATE users SET status = 'confirmed' WHERE id = $1 AND status = 'matched'",
         user.user_id
     )
     .execute(&state.db_pool)
     .await?;
 
+    if result.rows_affected() == 0 {
+        error!("Data race detected while accepting final match");
+        return Err(AppError::Internal);
+    }
     info!("User accepted final match");
 
     get_profile(State(state), Extension(user)).await
@@ -123,15 +129,15 @@ pub async fn reject_final_match(
     let mut tx = state.db_pool.begin().await?;
 
     // Update both users' statuses and delete the final match record
-    sqlx::query!(
-        "UPDATE users SET status = 'form_completed' WHERE id = $1",
+    let user_result = sqlx::query!(
+        "UPDATE users SET status = 'form_completed' WHERE id = $1 AND status = 'matched'",
         user.user_id
     )
     .execute(tx.as_mut())
     .await?;
 
-    sqlx::query!(
-        "UPDATE users SET status = 'form_completed' WHERE id = $1",
+    let partner_result = sqlx::query!(
+        "UPDATE users SET status = 'form_completed' WHERE id = $1 AND (status = 'matched' OR status = 'confirmed')",
         partner_id
     )
     .execute(tx.as_mut())
@@ -141,8 +147,36 @@ pub async fn reject_final_match(
         .execute(tx.as_mut())
         .await?;
 
-    tx.commit().await?;
+    if user_result.rows_affected() > 0 && partner_result.rows_affected() > 0 {
+        tx.commit().await?;
+        info!(%partner_id, "User rejected final match");
+    } else {
+        tx.rollback().await?;
+        error!(final_match_id = %final_match.id, %partner_id, "Data race detected while rejecting final match");
+        return Err(AppError::Internal);
+    }
 
-    info!(%partner_id, "User rejected final match");
     get_profile(State(state), Extension(user)).await
+}
+
+/// Gets the next scheduled final match time for users.
+///
+/// GET /api/next-match-time
+///
+/// This endpoint returns the earliest scheduled final match time that is
+/// still pending and in the future. Users can use this to know when the
+/// next automatic matching will occur. Returns null if no matches are scheduled.
+///
+/// # Returns
+///
+/// - `200 OK` with `NextMatchTimeResponse` - Next match time or null if none (if next_match_time
+/// is earlier than current time, this means the last scheduled match is being processed)
+/// - `500 Internal Server Error` - Database error
+#[instrument(skip_all, fields(request_id = %uuid::Uuid::new_v4()))]
+pub async fn get_next_match_time(
+    State(state): State<Arc<AppState>>,
+) -> AppResult<impl IntoResponse> {
+    let next = SchedulerService::get_next_scheduled_time(&state.db_pool).await?;
+
+    Ok(Json(NextMatchTimeResponse { next }))
 }

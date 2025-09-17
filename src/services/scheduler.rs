@@ -2,13 +2,15 @@ use std::collections::HashSet;
 
 use sqlx::PgPool;
 use time::OffsetDateTime;
-use tracing::{debug, error, info, instrument};
+use tracing::{error, info, instrument};
 use uuid::Uuid;
 
 use super::matching::MatchingService;
 use crate::error::{AppError, AppResult};
 use crate::models::{FinalMatch, ScheduleStatus, ScheduledFinalMatch, TagSystem};
-use crate::utils::constant::CHECK_SCHEDULED_MATCH_INTERVAL;
+use crate::utils::constant::{
+    CHECK_AUTO_ACCEPT_INTERVAL, CHECK_SCHEDULED_MATCH_INTERVAL, FINAL_MATCH_AUTO_ACCEPT_TIMEOUT,
+};
 
 pub struct SchedulerService;
 
@@ -99,6 +101,7 @@ impl SchedulerService {
     }
 
     /// Check for and execute any due scheduled matches
+    #[instrument(skip_all, err)]
     async fn check_and_execute_scheduled_matches(
         db_pool: &PgPool,
         tag_system: &TagSystem,
@@ -118,29 +121,13 @@ impl SchedulerService {
         .await?;
 
         for due_match in due_matches {
-            debug!(
+            let matches_created =
+                Self::execute_scheduled_final_match(db_pool, tag_system, due_match.id).await?;
+            info!(
                 scheduled_match_id = %due_match.id,
-                scheduled_time = %due_match.scheduled_time,
-                "Executing scheduled final match"
+                %matches_created,
+                "Scheduled final match completed successfully"
             );
-
-            // Execute the final matching
-            match Self::execute_scheduled_final_match(db_pool, tag_system, due_match.id).await {
-                Ok(matches_created) => {
-                    info!(
-                        scheduled_match_id = %due_match.id,
-                        matches_created,
-                        "Scheduled final match completed successfully"
-                    );
-                }
-                Err(e) => {
-                    error!(
-                        scheduled_match_id = %due_match.id,
-                        error = %e,
-                        "Scheduled final match failed"
-                    );
-                }
-            }
         }
 
         Ok(())
@@ -329,8 +316,77 @@ impl SchedulerService {
         .await
     }
 
+    /// Auto-accept final matches that have been pending for more than 24 hours
+    #[instrument(skip_all, err)]
+    pub async fn auto_accept_expired_matches(db_pool: &PgPool) -> AppResult<()> {
+        let cutoff_time = OffsetDateTime::now_utc() - FINAL_MATCH_AUTO_ACCEPT_TIMEOUT;
+
+        // Find final matches older than 24 hours where both users are still in 'matched' status
+        let expired_matches = sqlx::query!(
+            r#"
+            SELECT fm.id, fm.user_a_id, fm.user_b_id
+            FROM final_matches fm
+            JOIN users ua ON fm.user_a_id = ua.id
+            JOIN users ub ON fm.user_b_id = ub.id
+            WHERE fm.created_at <= $1
+            AND (ua.status = 'matched' OR ub.status = 'matched')
+            "#,
+            cutoff_time
+        )
+        .fetch_all(db_pool)
+        .await?;
+
+        for expired_match in expired_matches {
+            // Update both users to 'confirmed' status
+            let mut tx = db_pool.begin().await?;
+
+            let user_a_result = sqlx::query!(
+                "UPDATE users SET status = 'confirmed' WHERE id = $1 AND status = 'matched'",
+                expired_match.user_a_id
+            )
+            .execute(tx.as_mut())
+            .await?;
+
+            let user_b_result = sqlx::query!(
+                "UPDATE users SET status = 'confirmed' WHERE id = $1 AND status = 'matched'",
+                expired_match.user_b_id
+            )
+            .execute(tx.as_mut())
+            .await?;
+
+            // Only commit if both users were still in 'matched' status
+            if user_a_result.rows_affected() > 0 || user_b_result.rows_affected() > 0 {
+                tx.commit().await?;
+                info!(
+                    final_match_id = %expired_match.id,
+                    user_a_id = %expired_match.user_a_id,
+                    user_b_id = %expired_match.user_b_id,
+                    "Successfully auto-accepted expired final match"
+                );
+            } else {
+                tx.rollback().await?;
+                error!(final_match_id = %expired_match.id, "Data race detected while auto-accepting final match");
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Spawn the periodic task to auto-accept expired final matches
+    pub fn spawn_auto_accept_task(db_pool: PgPool) {
+        tokio::spawn(async move {
+            // Check every 10 minutes for expired final matches
+            let mut interval = tokio::time::interval(CHECK_AUTO_ACCEPT_INTERVAL);
+            interval.tick().await; // First tick completes immediately, so we skip it
+
+            loop {
+                interval.tick().await;
+                let _ = Self::auto_accept_expired_matches(&db_pool).await;
+            }
+        });
+    }
+
     /// Spawn the periodic scheduler task to check for due scheduled matches
-    #[instrument(skip_all)]
     pub fn spawn_scheduler_task(db_pool: PgPool, tag_system: &'static TagSystem) {
         tokio::spawn(async move {
             // Check every minute for due scheduled matches
@@ -339,12 +395,7 @@ impl SchedulerService {
 
             loop {
                 interval.tick().await;
-
-                if let Err(e) =
-                    Self::check_and_execute_scheduled_matches(&db_pool, tag_system).await
-                {
-                    error!("Failed to check and execute scheduled matches: {}", e);
-                }
+                let _ = Self::check_and_execute_scheduled_matches(&db_pool, tag_system).await;
             }
         });
     }

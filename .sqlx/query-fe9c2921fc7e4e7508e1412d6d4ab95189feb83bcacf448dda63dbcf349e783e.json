@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT fm.id, fm.user_a_id, fm.user_b_id\n            FROM final_matches fm\n            JOIN users ua ON fm.user_a_id = ua.id\n            JOIN users ub ON fm.user_b_id = ub.id\n            WHERE fm.created_at <= $1\n            AND (ua.status = 'matched' OR ub.status = 'matched')\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_a_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "user_b_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "fe9c2921fc7e4e7508e1412d6d4ab95189feb83bcacf448dda63dbcf349e783e"
+}

@@ -31,5 +31,14 @@ pub const INCOMPATIBLE_MATCH_SCORE: f64 = -1.0;
 /// Minimum IDF value to avoid division by zero or overly aggressive down-weighting
 pub const IDF_MIN: f64 = 0.1;
 
+/// Interval to refresh match previews
+pub const MATCH_PREVIEW_INTERVAL: Duration = Duration::from_secs(20 * 60); // 20 minutes
+
 /// Interval to check for scheduled matches
-pub const CHECK_SCHEDULED_MATCH_INTERVAL: Duration = Duration::from_secs(60);
+pub const CHECK_SCHEDULED_MATCH_INTERVAL: Duration = Duration::from_secs(60); // 1 minute
+
+/// Timeout after which final matches are automatically accepted
+pub const FINAL_MATCH_AUTO_ACCEPT_TIMEOUT: Duration = Duration::from_secs(24 * 60 * 60); // 24 hours
+
+/// Interval to check for final matches that need auto-acceptance
+pub const CHECK_AUTO_ACCEPT_INTERVAL: Duration = Duration::from_secs(10 * 60); // 10 minutes

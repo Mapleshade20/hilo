@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE users SET status = 'form_completed' WHERE id = $1 AND status = 'matched'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "540a2e669f0bc2e7d7ac1464386687c5bc047271e14ac6683daf069a655bf6e7"
+}
