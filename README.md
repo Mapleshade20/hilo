@@ -296,8 +296,7 @@ _Admin endpoints run on separate port (configured via `ADMIN_ADDRESS`)_
   }
   ```
 
-- `GET /api/admin/user` - Get detailed user information
-  - JSON request body: `email` or `user_id`
+- `GET /api/admin/user/{user_id}` - Get detailed user information
 
   ```json
   {
@@ -546,6 +545,7 @@ The email service supports multiple providers:
 ### Deployment Security Considerations
 
 - **Rate Limiting**: The verification code API has a built-in per-email rate limiting, but production deployments should implement IP-based rate limiting and ddos protection for all endpoints
+  - TODO: The current implementation of login code cache is not good enough. Should use Redis.
 - **System Time**: Ensure accurate system time for JWT token expiration
 - **Database Security**: Use strong passwords
 - **HTTPS**: Always use HTTPS in production with proper SSL certificates
