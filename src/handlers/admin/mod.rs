@@ -77,7 +77,7 @@ pub fn admin_router(db_pool: PgPool) -> Router {
         )
         .route("/api/admin/users", get(get_users_overview))
         .route("/api/admin/card/{filename}", get(serve_user_card_photo))
-        .route("/api/admin/user", get(get_user_detail))
+        .route("/api/admin/user/{user_id}", get(get_user_detail))
         .route("/api/admin/tags", get(get_tags_with_stats))
         .route("/api/admin/matches", get(get_final_matches))
         .route("/api/admin/stats", get(get_user_stats))

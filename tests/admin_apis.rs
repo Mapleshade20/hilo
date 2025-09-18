@@ -1,5 +1,4 @@
 use serde_json::Value;
-use serde_json::json;
 use sqlx::PgPool;
 
 mod common;
@@ -72,8 +71,7 @@ async fn test_admin_user_detail(db_pool: PgPool) {
     let client = reqwest::Client::new();
 
     let response = client
-        .get(format!("{}/api/admin/user", app.address))
-        .json(&json!({ "user_id": user_id }))
+        .get(format!("{}/api/admin/user/{}", app.address, user_id))
         .send()
         .await
         .expect("Failed to execute request");
