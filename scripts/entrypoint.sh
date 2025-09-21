@@ -11,5 +11,6 @@ else
   echo "[WARN] DB_PASSWORD_FILE not found, using default from DATABASE_URL if available. Do not use in production!"
 fi
 
+chown -R appuser:appuser /home/appuser/uploads
 
-exec "$@"
+exec su-exec appuser "$@"

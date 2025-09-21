@@ -1,5 +1,5 @@
 # For production deployment
-# use `podman compose -p hilo_prod -f production.yml up -d`
+# use `podman compose -f compose.yml up -d`
 version: "3.8"
 
 services:
@@ -36,13 +36,11 @@ services:
       EMAIL_PROVIDER: "external"
       MAIL_API_URL: "https://api.mailgun.net/v3/mail.maplewrt.com/messages"
       SENDER_EMAIL: "Project Contigo <no-reply@mail.maplewrt.com>"
-      DATABASE_URL: "postgres://hilo_user:hilo_pass@db:5432/hilo_db" # Updated via entrypoint
       RUST_LOG: "info"
       NO_COLOR: 1
       LOG_FORMAT: "plain"
       ADDRESS: "0.0.0.0:8090"
       ADMIN_ADDRESS: "0.0.0.0:8091"
-      UPLOAD_DIR: "/home/appuser/uploads"
       TAGS_LIMIT_SUM: 10
       TRAITS_LIMIT_EACH: 3
       TAG_SCORE_DECAY_FACTOR: 0.5
@@ -50,6 +48,10 @@ services:
       TRAIT_MATCH_POINTS: 2.0
       BOUNDARY_MATCH_POINTS: 1.5
       MAX_PREVIEW_CANDIDATES: 6
+
+      # Do not change
+      UPLOAD_DIR: "/home/appuser/uploads"                            # Chown via entrypoint
+      DATABASE_URL: "postgres://hilo_user:hilo_pass@db:5432/hilo_db" # Updated via entrypoint
 
       # Location to the secrets
       JWT_SECRET_FILE: "/run/secrets/hilo_jwt_secret"

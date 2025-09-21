@@ -497,15 +497,15 @@ $ podman secret create hilo_db_password ./db_password.txt
 3. **Compose and run in background**
 
 ```bash
-$ curl -o production.yml https://raw.githubusercontent.com/Mapleshade20/hilo/main/production.yml
-$ podman-compose -p hilo_prod -f production.yml up -d
+$ curl -o compose.yml https://raw.githubusercontent.com/Mapleshade20/hilo/main/compose.yml
+$ podman-compose up -d
 
-# Monitor health
+# To monitor health, run:
 $ curl http://localhost:8090/health-check
-$ podman logs hilo_prod_app_1
+$ podman logs hilo_app_1
 
 # To stop, run:
-$ podman-compose -p hilo_prod -f production.yml down
+$ podman-compose down
 ```
 
 4. **Go online**: Configure a reverse proxy on port `8090` and firewall to make it publicly accessible

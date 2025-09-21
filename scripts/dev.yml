@@ -43,12 +43,10 @@ services:
       MAIL_API_URL: "http://host.containers.internal:8092"
       MAIL_API_KEY: "test-api-key"
       SENDER_EMAIL: "hilo dev"
-      DATABASE_URL: "postgres://hilo_user:hilo_pass@db:5432/hilo_db"
       RUST_LOG: "info,hilo=debug"
       LOG_FORMAT: "plain"
       ADDRESS: "0.0.0.0:8090"
       ADMIN_ADDRESS: "0.0.0.0:8091"
-      UPLOAD_DIR: "/home/appuser/uploads"
       TAGS_LIMIT_SUM: 10
       TRAITS_LIMIT_EACH: 3
       TAG_SCORE_DECAY_FACTOR: 0.5
@@ -56,6 +54,9 @@ services:
       TRAIT_MATCH_POINTS: 2.0
       BOUNDARY_MATCH_POINTS: 1.5
       MAX_PREVIEW_CANDIDATES: 6
+      # Do not change
+      UPLOAD_DIR: "/home/appuser/uploads"
+      DATABASE_URL: "postgres://hilo_user:hilo_pass@db:5432/hilo_db"
 
     depends_on:
       db:
