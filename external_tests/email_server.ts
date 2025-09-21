@@ -7,7 +7,7 @@ const verificationCodes: Map<string, string> = new Map();
 // Extract verification code from HTML email body
 function extractVerificationCode(htmlBody: string): string | null {
   // Look for the hidden preheader text that contains the verification code
-  const preheaderMatch = htmlBody.match(/Your verification code is: (\d{6})/);
+  const preheaderMatch = htmlBody.match(/Your login code: (\d{6})/);
   return preheaderMatch ? preheaderMatch[1] : null;
 }
 

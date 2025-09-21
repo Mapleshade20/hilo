@@ -33,7 +33,8 @@ repos:
         entry: cargo sqlx prepare --check -- --all-targets
         language: system
         pass_filenames: false
-        always_run: true
+        types: [file]
+        files: ^.*(Cargo\.toml|Cargo\.lock|.*\.rs|query-.*\.json)$
         stages: [pre-commit]
   - repo: https://github.com/compilerla/conventional-pre-commit
     rev: v4.2.0

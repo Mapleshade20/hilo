@@ -23,13 +23,13 @@ pub fn generate_verification_email_html(code: &str) -> String {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Project Contigo Verification Code</title>
+    <title>Contigo✨</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol'; background-color: #f0f2f5;">
 
     <!-- This is a hidden preheader text. -->
     <div style="display:none;font-size:1px;color:#ffffff;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">
-        Your verification code is: {code}
+        Your login code: {code}
     </div>
 
     <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f0f2f5;">
@@ -72,7 +72,7 @@ pub fn generate_verification_email_html(code: &str) -> String {
                         <td align="center" style="padding: 30px 40px; border-top: 1px solid #e1e4e8;">
                             <p style="margin: 0; font-size: 12px; color: #90949c; line-height: 1.5;">
                                 &copy; {current_year} Project Contigo. All rights reserved.<br>
-                                This email was sent to you as part of the account verification process.
+                                This email was sent to you as part of the account verification process on <a href="https://contigo.maplewrt.com" style="color: #1877f2; text-decoration: none;">contigo.maplewrt.com</a>.
                             </p>
                         </td>
                     </tr>
