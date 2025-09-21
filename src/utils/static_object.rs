@@ -119,6 +119,16 @@ pub static TRAIT_MATCH_POINTS: LazyLock<f64> = LazyLock::new(|| {
         })
 });
 
+pub static BOUNDARY_MATCH_POINTS: LazyLock<f64> = LazyLock::new(|| {
+    env::var("BOUNDARY_MATCH_POINTS")
+        .ok()
+        .and_then(|val| val.parse().ok())
+        .unwrap_or_else(|| {
+            error!("Invalid or missing BOUNDARY_MATCH_POINTS env var, using fallback 1.0");
+            1.0
+        })
+});
+
 pub static TAGS_LIMIT_SUM: LazyLock<usize> = LazyLock::new(|| {
     env::var("TAGS_LIMIT_SUM")
         .ok()

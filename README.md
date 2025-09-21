@@ -41,7 +41,7 @@
    - Personal information (WeChat ID, gender, self-introduction)
    - Interest tags (familiar and aspirational categories)
    - Personality traits (self-assessment and ideal partner preferences)
-   - Physical boundaries and recent conversation topics
+   - Expected boundary and recent conversation topics
    - **Optional** profile photo upload
 
 2. **Tag Selection**: Users choose from a hierarchical tag system:
@@ -55,7 +55,7 @@
 Veto means rejection.
 
 1. **Preview Generation**: Background service periodically generates match suggestions:
-   - Algorithm considers tag compatibility, trait matching, and physical boundaries
+   - Algorithm considers tag compatibility, trait matching, and expected boundary
    - Matching tags receive higher scores, and complementary tags receive lower scores
 
 2. **User Review**: Users can view a couple of top-score potential matches

@@ -48,6 +48,7 @@ services:
       TAG_SCORE_DECAY_FACTOR: 0.5
       COMPLEMENTARY_TAG_WEIGHT: 0.8
       TRAIT_MATCH_POINTS: 2.0
+      BOUNDARY_MATCH_POINTS: 1.5
       MAX_PREVIEW_CANDIDATES: 6
 
       # Location to the secrets

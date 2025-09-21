@@ -9,8 +9,8 @@ use crate::models::{Form, Gender, TagSystem};
 use crate::utils::{
     constant::{IDF_MIN, INCOMPATIBLE_MATCH_SCORE, MATCH_PREVIEW_INTERVAL},
     static_object::{
-        COMPLEMENTARY_TAG_WEIGHT, MAX_PREVIEW_CANDIDATES, TAG_SCORE_DECAY_FACTOR,
-        TRAIT_MATCH_POINTS,
+        BOUNDARY_MATCH_POINTS, COMPLEMENTARY_TAG_WEIGHT, MAX_PREVIEW_CANDIDATES,
+        TAG_SCORE_DECAY_FACTOR, TRAIT_MATCH_POINTS,
     },
 };
 
@@ -80,9 +80,9 @@ impl MatchingService {
         score += Self::calculate_trait_compatibility(form_a, form_b);
 
         // C. Physical Boundary Scoring (B5)
-        // Perfect match gives 1 point
+        // Equal boundary get a small bonus
         if boundary_diff == 0 {
-            score += 1.0;
+            score += *BOUNDARY_MATCH_POINTS;
         }
 
         trace!(
