@@ -13,7 +13,7 @@ use axum::{
     response::IntoResponse,
 };
 use tower_http::services::ServeFile;
-use tracing::{debug, error, instrument, trace, warn};
+use tracing::{debug, error, instrument, warn};
 use uuid::Uuid;
 
 use crate::error::{AppError, AppResult};
@@ -33,14 +33,12 @@ use crate::utils::static_object::UPLOAD_DIR;
 /// - `200 OK` with image file - Partner's profile photo served successfully
 /// - `404 Not Found` - User not found or no profile photo available
 /// - `500 Internal Server Error` - Database or file system error
-#[instrument(skip_all, fields(request_id = %uuid::Uuid::new_v4()))]
+#[instrument(skip_all, fields(request_id = %uuid::Uuid::new_v4(), target = %requested_id))]
 pub async fn serve_partner_image(
     State(state): State<Arc<AppState>>,
     Extension(requested_id): Extension<Uuid>,
     req: Request<Body>,
 ) -> AppResult<impl IntoResponse> {
-    trace!("Serving partner image");
-
     // Query the partner's profile photo filename
     let photo_filename = sqlx::query!(
         r#"
@@ -53,12 +51,12 @@ pub async fn serve_partner_image(
     .fetch_optional(&state.db_pool)
     .await?
     .ok_or_else(|| {
-        warn!(?requested_id, "User not found in forms table");
+        warn!("User not found in forms table");
         AppError::NotFound("User not found")
     })?
     .profile_photo_filename
     .ok_or_else(|| {
-        debug!(?requested_id, "No profile photo found");
+        debug!("No profile photo found");
         AppError::NotFound("No profile photo found")
     })?;
 
@@ -67,14 +65,18 @@ pub async fn serve_partner_image(
         .join("profile_photos")
         .join(photo_filename);
 
-    debug!("Serving file: {:?}", file_path);
-
     // Use tower-http's ServeFile to serve the image
     let mut service = ServeFile::new(file_path);
     service
         .try_call(req)
         .await
-        .map(|res| res.into_response())
+        .inspect(|res| {
+            if res.status().is_success() {
+                debug!("File served successfully");
+            } else {
+                warn!("File serving returned status: {}", res.status());
+            }
+        })
         .map_err(|e| {
             error!("Failed to serve file: {}", e);
             AppError::Internal

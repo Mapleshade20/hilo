@@ -38,9 +38,12 @@ use sqlx::PgPool;
 use tracing::warn;
 use uuid::Uuid;
 
-use crate::error::{AppError, AppResult};
 use crate::models::{TagNode, TagSystem, UserStatus};
 use crate::utils::static_object::TAG_SYSTEM;
+use crate::{
+    error::{AppError, AppResult},
+    handlers::admin::view::serve_user_profile_photo,
+};
 use action::{
     cancel_scheduled_match, create_scheduled_matches, get_scheduled_matches,
     trigger_final_matching, update_match_previews, verify_user,
@@ -77,6 +80,7 @@ pub fn admin_router(db_pool: PgPool) -> Router {
         )
         .route("/api/admin/users", get(get_users_overview))
         .route("/api/admin/card/{filename}", get(serve_user_card_photo))
+        .route("/api/admin/photo/{filename}", get(serve_user_profile_photo))
         .route("/api/admin/user/{user_id}", get(get_user_detail))
         .route("/api/admin/tags", get(get_tags_with_stats))
         .route("/api/admin/matches", get(get_final_matches))

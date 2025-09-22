@@ -305,7 +305,7 @@ _Admin endpoints run on separate port (configured via `ADMIN_ADDRESS`)_
     "status": "form_completed",
     "wechat_id": "examplewechatid",
     "grade": "undergraduate",
-    "card_photo_uri": "/api/admin/users/91f4cf07-b2b4-4c05-a31e-9ed524c936ee.jpg",
+    "card_photo_uri": "/api/admin/card/91f4cf07-b2b4-4c05-a31e-9ed524c936ee.jpg",
     "created_at": [2025, 250, 3, 35, 40, 479291000, 0, 0, 0],
     "updated_at": [2025, 250, 3, 56, 32, 487637000, 0, 0, 0],
     "form": {
@@ -317,7 +317,7 @@ _Admin endpoints run on separate port (configured via `ADMIN_ADDRESS`)_
       "ideal_traits": ["empathy", "explorer"],
       "physical_boundary": 3,
       "self_intro": "Hello world",
-      "profile_photo_uri": "/api/admin/users/91f4cf07-b2b4-4c05-a31e-9ed524c936ee.jpg"
+      "profile_photo_uri": "/api/admin/photo/91f4cf07-b2b4-4c05-a31e-9ed524c936ee.jpg"
     }
   }
   ```
@@ -336,7 +336,10 @@ _Admin endpoints run on separate port (configured via `ADMIN_ADDRESS`)_
   }
   ```
 
-- `GET /api/admin/card/{filename}` - Get user ID card photo
+- `GET /api/admin/card/{filename}` - Get user student card photo
+  - Returns `200 OK` with image
+
+- `GET /api/admin/photo/{filename}` - Get user profile photo
   - Returns `200 OK` with image
 
 #### Analytics & Statistics
@@ -553,7 +556,7 @@ The email service supports multiple providers:
 
 ### Environment Variables in Production
 
-Configure environment variables in `podman-compose.yml`. For their meanings refer to `.env`
+Configure environment variables in `compose.yml`. For their meanings refer to `.env`
 
 ### User Management Workflow for Admin
 

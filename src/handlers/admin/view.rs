@@ -31,7 +31,7 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use time::OffsetDateTime;
 use tower_http::services::ServeFile;
-use tracing::{error, info, instrument};
+use tracing::{debug, error, instrument};
 use uuid::Uuid;
 
 use super::{AdminState, convert_tags_to_stats};
@@ -178,7 +178,6 @@ pub async fn get_users_overview(
 ///
 /// This endpoint serves student verification card photos stored in the filesystem.
 /// Used by admins to review submitted cards during the user verification process.
-/// Files are served directly from the card_photos directory.
 ///
 /// # Returns
 ///
@@ -195,15 +194,59 @@ pub async fn serve_user_card_photo(
         .join("card_photos")
         .join(&filename);
 
-    info!("Serving card photo: {:?}", file_path);
+    // Use tower-http's ServeFile to serve the image
+    let mut service = ServeFile::new(file_path);
+    match service.try_call(req).await {
+        Ok(res) => {
+            if res.status() == StatusCode::OK {
+                debug!(%filename, "Card photo served successfully");
+            } else {
+                error!(%filename, "Card photo not found");
+            }
+            res.into_response()
+        }
+        Err(e) => {
+            error!("Failed to serve card photo file: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
+}
+
+/// Serves user profile photos for admin review.
+///
+/// GET /api/admin/photo/{filename}
+///
+/// This endpoint serves user profile photos stored in the filesystem.
+///
+/// # Returns
+///
+/// - `200 OK` with image file - Profile photo served successfully
+/// - `404 Not Found` - Profile photo file not found
+/// - `500 Internal Server Error` - File system error
+#[instrument(skip_all, fields(request_id = %uuid::Uuid::new_v4()))]
+pub async fn serve_user_profile_photo(
+    AxumPath(filename): AxumPath<String>,
+    req: Request<Body>,
+) -> Response {
+    // Construct the file path for profile photos
+    let file_path = Path::new(UPLOAD_DIR.as_str())
+        .join("profile_photos")
+        .join(&filename);
 
     // Use tower-http's ServeFile to serve the image
     let mut service = ServeFile::new(file_path);
     match service.try_call(req).await {
-        Ok(res) => res.into_response(),
+        Ok(res) => {
+            if res.status() == StatusCode::OK {
+                debug!(%filename, "Profile photo served successfully");
+            } else {
+                error!(%filename, "Profile photo not found");
+            }
+            res.into_response()
+        }
         Err(e) => {
-            error!("Failed to serve card photo file: {}", e);
-            (StatusCode::NOT_FOUND, "Card photo not found").into_response()
+            error!("Failed to serve profile photo file: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to serve file").into_response()
         }
     }
 }
@@ -297,7 +340,7 @@ pub async fn get_user_detail(
             self_intro: form.self_intro,
             profile_photo_uri: form
                 .profile_photo_filename
-                .map(|filename| format!("/api/admin/users/{}", filename)),
+                .map(|filename| format!("/api/admin/photo/{}", filename)),
         }),
         Ok(None) => None,
         Err(e) => {
@@ -314,7 +357,7 @@ pub async fn get_user_detail(
         grade: user.grade,
         card_photo_uri: user
             .card_photo_filename
-            .map(|filename| format!("/api/admin/users/{}", filename)),
+            .map(|filename| format!("/api/admin/card/{}", filename)),
         created_at: user.created_at,
         updated_at: user.updated_at,
         form: form_info,
