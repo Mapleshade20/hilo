@@ -20,7 +20,11 @@ use uuid::Uuid;
 use crate::error::{AppError, AppResult};
 use crate::middleware::AuthUser;
 use crate::models::{AppState, Form, Gender, UserStatus};
-use crate::utils::{file, static_object::UPLOAD_DIR};
+use crate::services::matching::MatchingService;
+use crate::utils::{
+    file,
+    static_object::{TAG_SYSTEM, UPLOAD_DIR},
+};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FormRequest {
@@ -76,7 +80,7 @@ pub async fn submit_form(
 
     // Validate each field of the form
     payload
-        .validate_request(state.tag_system)
+        .validate_request(&TAG_SYSTEM)
         .map_err(AppError::BadRequest)?;
 
     // Validate profile photo filename if provided
@@ -137,12 +141,12 @@ pub async fn submit_form(
         )
         .execute(&state.db_pool)
         .await?;
-
-        debug!("User status updated to form_completed");
     }
 
-    info!("Form submitted successfully");
+    // Trigger a match preview
+    MatchingService::generate_match_previews(&state.db_pool, &TAG_SYSTEM).await?;
 
+    info!("Form submitted successfully");
     Ok((StatusCode::OK, Json(form)))
 }
 

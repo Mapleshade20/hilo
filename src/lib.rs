@@ -96,12 +96,7 @@ pub fn app_with_email_service(db_pool: PgPool, email_service: Arc<dyn EmailServi
         )
     };
 
-    let state = Arc::new(AppState::new(
-        email_service,
-        db_pool,
-        jwt_service,
-        &TAG_SYSTEM,
-    ));
+    let state = Arc::new(AppState::new(email_service, db_pool, jwt_service));
 
     let state_clone = Arc::clone(&state);
     tokio::spawn(async move {

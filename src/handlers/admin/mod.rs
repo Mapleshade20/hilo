@@ -38,8 +38,7 @@ use sqlx::PgPool;
 use tracing::warn;
 use uuid::Uuid;
 
-use crate::models::{TagNode, TagSystem, UserStatus};
-use crate::utils::static_object::TAG_SYSTEM;
+use crate::models::{TagNode, UserStatus};
 use crate::{
     error::{AppError, AppResult},
     handlers::admin::view::serve_user_profile_photo,
@@ -55,15 +54,11 @@ use view::{
 
 pub struct AdminState {
     pub db_pool: PgPool,
-    pub tag_system: &'static TagSystem,
 }
 
 /// Create the admin router with admin-specific routes
 pub fn admin_router(db_pool: PgPool) -> Router {
-    let state = Arc::new(AdminState {
-        db_pool,
-        tag_system: &TAG_SYSTEM,
-    });
+    let state = Arc::new(AdminState { db_pool });
 
     Router::new()
         .route("/api/admin/trigger-match", post(trigger_final_matching))

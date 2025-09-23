@@ -5,7 +5,6 @@ use dashmap::DashMap;
 use sqlx::PgPool;
 use tracing::{debug, info, instrument};
 
-use crate::models::TagSystem;
 use crate::services::{email::EmailService, jwt::JwtService};
 use crate::utils::constant::*;
 
@@ -21,8 +20,6 @@ pub struct AppState {
     pub db_pool: PgPool,
     /// JWT service for token generation and validation.
     pub jwt_service: JwtService,
-    /// Tag system for tag validation and hierarchy processing.
-    pub tag_system: &'static TagSystem,
 }
 
 impl AppState {
@@ -33,12 +30,10 @@ impl AppState {
     /// * `email_service` - Service for sending verification emails
     /// * `db_pool` - PostgreSQL database connection pool
     /// * `jwt_service` - Service for JWT token operations
-    /// * `tag_system` - Tag system for validation and hierarchy processing
     pub fn new(
         email_service: Arc<dyn EmailService>,
         db_pool: PgPool,
         jwt_service: JwtService,
-        tag_system: &'static TagSystem,
     ) -> Self {
         info!("Initializing application state");
         debug!(
@@ -52,7 +47,6 @@ impl AppState {
             email_service,
             db_pool,
             jwt_service,
-            tag_system,
         }
     }
 
