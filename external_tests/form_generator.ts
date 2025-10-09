@@ -9,6 +9,11 @@ import {
   colorPrint,
 } from "./utils.ts";
 
+interface Trait {
+  id: string;
+  name: string;
+}
+
 const HILO_API_URL = "http://127.0.0.1:8090";
 
 // Generate form data based on mode
@@ -17,6 +22,8 @@ export function generateFormData(
   mode: TestMode,
   leafTags: string[],
   config?: TagConfig,
+  fullMode: boolean = false,
+  traits: string[] = [],
 ): FormData {
   let familiarTags: string[] = [];
   let aspirationalTags: string[] = [];
@@ -37,15 +44,33 @@ export function generateFormData(
     }
   }
 
+  // Generate random traits and physical_boundary if fullMode is enabled
+  let selfTraits: string[] = [];
+  let idealTraits: string[] = [];
+  let physicalBoundary = 3;
+
+  if (fullMode && traits.length > 0) {
+    // Randomize physical_boundary between 1 and 4
+    physicalBoundary = Math.floor(Math.random() * 4) + 1;
+
+    // Randomly select 3 traits for self_traits
+    const shuffledTraits = [...traits].sort(() => Math.random() - 0.5);
+    selfTraits = shuffledTraits.slice(0, 3);
+
+    // Randomly select 3 different traits for ideal_traits
+    const remainingTraits = shuffledTraits.slice(3);
+    idealTraits = remainingTraits.slice(0, 3);
+  }
+
   return {
     wechat_id: generateWeChatId(user.id),
     gender: user.gender,
     familiar_tags: familiarTags,
     aspirational_tags: aspirationalTags,
     recent_topics: `I'm User ${user.id} and I love meeting new people! I enjoy various activities and am looking forward to connecting with like-minded individuals.`,
-    self_traits: [], // Empty as specified
-    ideal_traits: [], // Empty as specified
-    physical_boundary: 3, // Set to 3 as specified
+    self_traits: selfTraits,
+    ideal_traits: idealTraits,
+    physical_boundary: physicalBoundary,
     self_intro: `Hello! I'm User ${user.id}. I'm a ${user.gender} student who enjoys ${familiarTags.slice(0, 2).join(" and ")}. Looking forward to making new connections!`,
   };
 }
@@ -77,6 +102,7 @@ export async function submitAllForms(
   mode: TestMode,
   leafTags: string[],
   configPath?: string,
+  fullMode: boolean = false,
 ): Promise<void> {
   console.log(`\n📝 Generating and submitting forms in ${mode} mode...`);
 
@@ -89,16 +115,29 @@ export async function submitAllForms(
       );
     } catch (error) {
       colorPrint(
-        `⚠️  Failed to load config file, falling back to random mode: ${error instanceof Error ? error.message : String(error)}`,
+        `!  Failed to load config file, falling back to random mode: ${error instanceof Error ? error.message : String(error)}`,
         colors.yellow,
       );
       mode = "random";
     }
   }
 
+  // Load traits if fullMode is enabled
+  let traits: string[] = [];
+  if (fullMode) {
+    try {
+      traits = await loadTraits();
+    } catch (error) {
+      colorPrint(
+        `⚠️  Failed to load traits, continuing without traits: ${error instanceof Error ? error.message : String(error)}`,
+        colors.yellow,
+      );
+    }
+  }
+
   const formPromises = users.map(async (user) => {
     try {
-      const formData = generateFormData(user, mode, leafTags, config);
+      const formData = generateFormData(user, mode, leafTags, config, fullMode, traits);
       await submitForm(user, formData);
 
       console.log(`✅ User ${user.id} form submitted:`);
@@ -108,6 +147,15 @@ export async function submitAllForms(
       console.log(
         `   Aspirational: ${formData.aspirational_tags.join(", ") || "none"}`,
       );
+      if (fullMode) {
+        console.log(
+          `   Self traits: ${formData.self_traits.join(", ") || "none"}`,
+        );
+        console.log(
+          `   Ideal traits: ${formData.ideal_traits.join(", ") || "none"}`,
+        );
+        console.log(`   Physical boundary: ${formData.physical_boundary}`);
+      }
 
       return formData;
     } catch (error) {
@@ -147,6 +195,25 @@ export async function loadTags(): Promise<string[]> {
   } catch (error) {
     colorPrint(
       `❌ Failed to load tags.json: ${error instanceof Error ? error.message : String(error)}`,
+      colors.red,
+    );
+    throw error;
+  }
+}
+
+// Load traits from traits.json
+export async function loadTraits(): Promise<string[]> {
+  try {
+    const traitsContent = await Deno.readTextFile("../traits.json");
+    const traits: Trait[] = JSON.parse(traitsContent);
+    const traitIds = traits.map(trait => trait.id);
+
+    console.log(`🎭 Loaded ${traitIds.length} traits from traits.json`);
+
+    return traitIds;
+  } catch (error) {
+    colorPrint(
+      `❌ Failed to load traits.json: ${error instanceof Error ? error.message : String(error)}`,
       colors.red,
     );
     throw error;

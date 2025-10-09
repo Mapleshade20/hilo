@@ -14,10 +14,10 @@ This directory contains a comprehensive external test for the Hilo social pairin
 
 ## Usage
 
-### Basic Usage (Random Mode)
+### Full Random Mode (include traits and boundaries)
 
 ```bash
-deno run --allow-all main.ts
+deno run --allow-all main.ts --users 6 --full
 ```
 
 ### Specify User Count
@@ -25,6 +25,14 @@ deno run --allow-all main.ts
 ```bash
 deno run --allow-all main.ts --users 10
 ```
+
+### Specify Male Count in Random Mode
+
+```bash
+deno run --allow-all main.ts --users 10 --males 7
+```
+
+This creates 7 male users and 3 female users. Without `--males`, the default behavior is odd user IDs are male and even user IDs are female.
 
 ### Use Configuration Mode
 
@@ -36,6 +44,16 @@ deno run --allow-all main.ts --mode config --config config.txt
 
 ```bash
 deno run --allow-all main.ts --mode config --users 12 --config config.txt
+```
+
+### Advanced Examples
+
+```bash
+# 10 users with 8 males, 2 females, full randomization
+deno run --allow-all main.ts --users 10 --males 8 --full
+
+# 20 users with 12 males, 8 females
+deno run --allow-all main.ts --users 20 --males 12
 ```
 
 ## Test Flow

@@ -78,12 +78,14 @@ async function displayMatchResults(users: User[]): Promise<void> {
 }
 
 // Parse command line arguments
-function parseArgs(): { mode: TestMode; userCount: number; configPath?: string } {
+function parseArgs(): { mode: TestMode; userCount: number; maleCount?: number; configPath?: string; fullMode: boolean } {
   const args = Deno.args;
 
   let mode: TestMode = "random";
   let userCount = 6;
+  let maleCount: number | undefined;
   let configPath: string | undefined;
+  let fullMode = false;
 
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
@@ -100,25 +102,41 @@ function parseArgs(): { mode: TestMode; userCount: number; configPath?: string }
           i++;
         }
         break;
+      case "--males":
+        const males = parseInt(args[i + 1]);
+        if (!isNaN(males) && males >= 0) {
+          maleCount = males;
+          i++;
+        }
+        break;
       case "--config":
         configPath = args[i + 1];
         i++;
         break;
+      case "--full":
+        fullMode = true;
+        break;
     }
   }
 
-  return { mode, userCount, configPath };
+  return { mode, userCount, maleCount, configPath, fullMode };
 }
 
 // Main function
 async function main(): Promise<void> {
-  const { mode, userCount, configPath } = parseArgs();
+  const { mode, userCount, maleCount, configPath, fullMode } = parseArgs();
 
   printHeader("HILO MATCHING SIMULATION");
   console.log(`📊 Mode: ${mode}`);
   console.log(`👥 Users: ${userCount}`);
+  if (maleCount !== undefined) {
+    console.log(`👨 Males: ${maleCount}, 👩 Females: ${userCount - maleCount}`);
+  }
   if (configPath) {
     console.log(`📋 Config: ${configPath}`);
+  }
+  if (fullMode) {
+    console.log(`🎲 Full randomization: enabled`);
   }
   console.log();
 
@@ -134,10 +152,10 @@ async function main(): Promise<void> {
 
     // Step 3: Setup users
     clearVerificationCodes();
-    const users = await setupUsers(userCount);
+    const users = await setupUsers(userCount, maleCount);
 
     // Step 4: Submit forms
-    await submitAllForms(users, mode, leafTags, configPath);
+    await submitAllForms(users, mode, leafTags, configPath, fullMode);
 
     // Step 5: Update match previews
     await updateMatchPreviews();

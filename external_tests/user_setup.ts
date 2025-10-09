@@ -78,9 +78,8 @@ async function verifyUserAsAdmin(email: string): Promise<void> {
 }
 
 // Complete user setup process
-export async function setupUser(userId: number): Promise<User> {
+export async function setupUser(userId: number, gender: "male" | "female"): Promise<User> {
   const email = generateTestEmail(userId);
-  const gender = userId % 2 === 1 ? "male" : "female";
   const grade = Math.random() > 0.5 ? "undergraduate" : "graduate";
 
   colorPrint(`Setting up User ${userId} (${gender}): ${email}`, colors.cyan);
@@ -126,12 +125,26 @@ export async function setupUser(userId: number): Promise<User> {
 }
 
 // Setup multiple users concurrently
-export async function setupUsers(userCount: number): Promise<User[]> {
+export async function setupUsers(userCount: number, maleCount?: number): Promise<User[]> {
   console.log(`\n🚀 Setting up ${userCount} users...`);
 
-  const setupPromises = Array.from({ length: userCount }, (_, i) =>
-    setupUser(i + 1)
-  );
+  // Determine gender for each user
+  // If maleCount is specified, first maleCount users are male, rest are female
+  // If maleCount is not specified, use default logic: odd userIds are male, even are female
+  const setupPromises = Array.from({ length: userCount }, (_, i) => {
+    const userId = i + 1;
+    let gender: "male" | "female";
+
+    if (maleCount !== undefined) {
+      // Use explicit male count
+      gender = userId <= maleCount ? "male" : "female";
+    } else {
+      // Default behavior: odd IDs are male, even IDs are female
+      gender = userId % 2 === 1 ? "male" : "female";
+    }
+
+    return setupUser(userId, gender);
+  });
 
   try {
     const users = await Promise.all(setupPromises);
