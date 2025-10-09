@@ -470,6 +470,12 @@ _Admin endpoints run on separate port (configured via `ADMIN_ADDRESS`)_
 - `DELETE /api/admin/scheduled-matches/{id}` - Cancel a scheduled final match
   - Returns 200 OK
 
+- `DELETE /api/admin/final-matches/{id}` - Delete a final match and revert users
+  - Deletes the final match by ID and reverts both users' status to `form_completed`
+  - Useful for correcting matching errors or handling rematch requests
+  - Returns 200 OK with `{"success": true, "message": "Final match deleted and users reverted successfully"}`
+  - Returns 404 if match not found
+
 </details>
 
 ## Quick Start

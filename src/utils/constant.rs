@@ -8,7 +8,7 @@ pub const VERIFICATION_CODE_EXPIRY: Duration = Duration::from_secs(5 * 60);
 
 /// When caches exceed this size, expired entries are cleaned up
 /// to prevent unlimited memory growth.
-pub const CACHE_CAPACITY: usize = 30;
+pub const CACHE_CAPACITY: usize = 10;
 
 /// Interval for automatic cache cleanup
 pub const CACHE_CLEANUP_INTERVAL: Duration = Duration::from_secs(3 * 60);

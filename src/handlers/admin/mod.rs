@@ -44,7 +44,7 @@ use crate::{
     handlers::admin::view::serve_user_profile_photo,
 };
 use action::{
-    cancel_scheduled_match, create_scheduled_matches, get_scheduled_matches,
+    cancel_scheduled_match, create_scheduled_matches, delete_final_match, get_scheduled_matches,
     trigger_final_matching, update_match_previews, verify_user,
 };
 use view::{
@@ -79,6 +79,7 @@ pub fn admin_router(db_pool: PgPool) -> Router {
         .route("/api/admin/user/{user_id}", get(get_user_detail))
         .route("/api/admin/tags", get(get_tags_with_stats))
         .route("/api/admin/matches", get(get_final_matches))
+        .route("/api/admin/final-matches/{id}", delete(delete_final_match))
         .route("/api/admin/stats", get(get_user_stats))
         .with_state(state)
 }

@@ -299,3 +299,77 @@ pub async fn cancel_scheduled_match(
         message: "Scheduled match cancelled successfully",
     }))
 }
+
+/// Deletes a final match and reverts both users' status to form_completed.
+///
+/// DELETE /api/admin/final-matches/{id}
+///
+/// This endpoint allows administrators to delete a final match by ID and
+/// revert both matched users back to 'form_completed' status. This is useful
+/// for correcting matching errors or handling user requests to be rematched.
+///
+/// # Returns
+///
+/// - `200 OK` with `ActionResponse` - Match deleted and users reverted successfully
+/// - `404 Not Found` - Match not found
+/// - `500 Internal Server Error` - Database error
+#[instrument(skip_all, fields(request_id = %uuid::Uuid::new_v4(), match_id = %match_id))]
+pub async fn delete_final_match(
+    State(state): State<Arc<AdminState>>,
+    AxumPath(match_id): AxumPath<Uuid>,
+) -> AppResult<impl IntoResponse> {
+    // Start a transaction to ensure atomicity
+    let mut tx = state.db_pool.begin().await?;
+
+    // Fetch the final match to get user IDs
+    let final_match = sqlx::query!(
+        r#"SELECT user_a_id, user_b_id FROM final_matches WHERE id = $1"#,
+        match_id
+    )
+    .fetch_optional(tx.as_mut())
+    .await?;
+
+    let final_match = match final_match {
+        Some(fm) => fm,
+        None => {
+            tx.rollback().await?;
+            warn!(%match_id, "Final match not found");
+            return Err(AppError::NotFound("Final match not found"));
+        }
+    };
+
+    // Delete the final match
+    sqlx::query!(r#"DELETE FROM final_matches WHERE id = $1"#, match_id)
+        .execute(tx.as_mut())
+        .await?;
+
+    // Revert both users' status to form_completed
+    sqlx::query!(
+        r#"UPDATE users SET status = 'form_completed' WHERE id = $1"#,
+        final_match.user_a_id
+    )
+    .execute(tx.as_mut())
+    .await?;
+
+    sqlx::query!(
+        r#"UPDATE users SET status = 'form_completed' WHERE id = $1"#,
+        final_match.user_b_id
+    )
+    .execute(tx.as_mut())
+    .await?;
+
+    // Commit the transaction
+    tx.commit().await?;
+
+    info!(
+        %match_id,
+        user_a_id = %final_match.user_a_id,
+        user_b_id = %final_match.user_b_id,
+        "Successfully deleted final match and reverted users to form_completed"
+    );
+
+    Ok(Json(ActionResponse {
+        success: true,
+        message: "Final match deleted and users reverted successfully",
+    }))
+}
