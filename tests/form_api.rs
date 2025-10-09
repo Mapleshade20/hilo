@@ -159,7 +159,6 @@ async fn test_get_form_success(pool: PgPool) {
         retrieved_form.familiar_tags,
         vec!["basketball", "pc_fps", "japanese"]
     );
-    assert_eq!(retrieved_form.aspirational_tags, vec!["study_together"]);
     assert_eq!(retrieved_form.physical_boundary, 2);
     assert!(retrieved_form.recent_topics.contains("machine learning"));
     assert!(
@@ -260,14 +259,8 @@ async fn test_submit_form_too_many_tags(pool: PgPool) {
         "japanese",
         "badminton"
     ]);
-    form_data["aspirational_tags"] = json!([
-        "crafts",
-        "study_together",
-        "drawing_photo",
-        "spanish",
-        "instruments",
-        "dance"
-    ]);
+    form_data["aspirational_tags"] =
+        json!(["crafts", "running", "tennis", "spanish", "wild", "fitness"]);
 
     let response = client
         .post(format!("{}/api/form", &address))

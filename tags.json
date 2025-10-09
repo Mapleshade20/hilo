@@ -1,8 +1,192 @@
 [
 	{
-		"id": "sports",
-		"name": "运动",
-		"is_matchable": true,
+		"id": "mental_shelter",
+		"name": "「精神角落」",
+		"is_matchable": false,
+		"children": [
+			{
+				"id": "gaming",
+				"name": "游戏人生🎮",
+				"is_matchable": false,
+				"children": [
+					{
+						"id": "competitive_games",
+						"name": "竞技向玩家",
+						"is_matchable": true,
+						"children": [
+							{
+								"id": "pc_fps",
+								"name": "PC端FPS",
+								"desc": "Apex/PUBG/Valorant等",
+								"is_matchable": true
+							},
+							{
+								"id": "moba",
+								"name": "MOBA",
+								"desc": "Dota2/LOL/王者等",
+								"is_matchable": true
+							},
+							{
+								"id": "mobile_games",
+								"name": "其余各类手游",
+								"is_matchable": true
+							}
+						]
+					},
+					{
+						"id": "story_rich_games",
+						"name": "偏好剧情体验的玩家",
+						"desc": "更注重游戏沉浸性和故事情节",
+						"is_matchable": true,
+						"children": [
+							{
+								"id": "rpg_games",
+								"name": "RPG/动作冒险",
+								"desc": "巫师/艾尔登法环/2077等大作",
+								"is_matchable": true
+							},
+							{
+								"id": "puzzle_games",
+								"name": "沉浸式解谜/精品独立游戏",
+								"desc": "玩法、美术或叙事独具匠心，能带来独特情感体验，如小小梦魇/Undertale/星际拓荒/Celeste",
+								"is_matchable": true
+							}
+						]
+					},
+					{
+						"id": "strategy_games",
+						"name": "战略类游戏的甲级战犯",
+						"desc": "回合制(如文明)/即时制(如星际争霸)",
+						"is_matchable": true
+					},
+					{
+						"id": "simulation_games",
+						"name": "模拟经营佛系玩家",
+						"desc": "缺氧/天际线/图灵完备/模拟飞行等模拟或沙盒",
+						"is_matchable": true
+					},
+					{
+						"id": "music_games",
+						"name": "音游人",
+						"is_matchable": true
+					},
+					{
+						"id": "party_games",
+						"name": "派对游戏爱好者",
+						"desc": "适合与朋友同屏或联机并主打欢乐互动的游戏，如双人成行、胡闹厨房、马力欧派对、糖豆人",
+						"is_matchable": true
+					}
+				]
+			},
+			{
+				"id": "art_perception",
+				"name": "艺术感知 👀",
+				"is_matchable": false,
+				"children": [
+					{
+						"id": "acg",
+						"name": "ACG 异次元🌌",
+						"desc": "动漫，二次元文化认同",
+						"is_matchable": true
+					},
+					{
+						"id": "film_enthusiast",
+						"name": "电影阅片家🎬",
+						"desc": "不只看电影，还热爱分析、讨论、影评",
+						"is_matchable": true
+					},
+					{
+						"id": "livehouse_fan",
+						"name": "Livehouse 常客🎸",
+						"desc": "沉迷现场音乐的氛围和体验",
+						"is_matchable": true
+					},
+					{
+						"id": "karaoke",
+						"name": "预备役KTV麦霸🎤",
+						"desc": "听着歌即兴就想唱出来，或许还能弹唱",
+						"is_matchable": false,
+						"children": [
+							{
+								"id": "karaoke_western",
+								"name": "🎤欧美",
+								"is_matchable": true
+							},
+							{
+								"id": "karaoke_chinese",
+								"name": "🎤华语",
+								"is_matchable": true
+							},
+							{
+								"id": "karaoke_jp_kr",
+								"name": "🎤日韩",
+								"is_matchable": true
+							}
+						]
+					}
+				]
+			},
+			{
+				"id": "lifestyle",
+				"name": "生活美学",
+				"is_matchable": false,
+				"children": [
+					{
+						"id": "pet_lover",
+						"name": "猫奴/狗奴🐾",
+						"desc": "对宠物有很多的爱和亲切感",
+						"is_matchable": true
+					},
+					{
+						"id": "fashion_artist",
+						"name": "穿搭艺术家👕",
+						"desc": "始终追求时尚和个人风格",
+						"is_matchable": true
+					},
+					{
+						"id": "home_chef",
+						"name": "人间烟火厨神🍳",
+						"desc": "享受自己动手做饭或烹饪的乐趣和成就感",
+						"is_matchable": true
+					},
+					{
+						"id": "diy_creator",
+						"name": "DIY 创造者🛠",
+						"desc": "喜欢手工、手帐、编织等",
+						"is_matchable": true
+					},
+					{
+						"id": "board_gamer",
+						"name": "线下桌游气氛组🎲",
+						"desc": "喜欢桌游、剧本杀等线下社交游戏",
+						"is_matchable": true
+					},
+					{
+						"id": "painter",
+						"name": "即兴画手🎨",
+						"desc": "板绘、水彩、速写、漫画",
+						"is_matchable": true
+					},
+					{
+						"id": "photographer",
+						"name": "摄影爱好者/扫街派📷",
+						"desc": "从镜头中观察世界，探索街角小巷的惊喜",
+						"is_matchable": true
+					},
+					{
+						"id": "foodie",
+						"name": "美食探店家🍜",
+						"desc": "对美食有热情，热衷于发现和品尝各种餐厅",
+						"is_matchable": true
+					}
+				]
+			}
+		]
+	},
+	{
+		"id": "physical_activity",
+		"name": "「永远鲜活」",
+		"is_matchable": false,
 		"children": [
 			{
 				"id": "volleyball",
@@ -41,22 +225,7 @@
 			},
 			{
 				"id": "wild",
-				"name": "骑行🚴/徒步🚶/登山⛰/露营⛺/攀岩🧗",
-				"is_matchable": true
-			},
-			{
-				"id": "yoga",
-				"name": "瑜伽🧘",
-				"is_matchable": true
-			},
-			{
-				"id": "martial_arts",
-				"name": "武术/搏击🥋",
-				"is_matchable": true
-			},
-			{
-				"id": "dance",
-				"name": "舞蹈💃",
+				"name": "山野⛰(登山/远足/露营)",
 				"is_matchable": true
 			},
 			{
@@ -66,159 +235,37 @@
 			},
 			{
 				"id": "water_sports",
-				"name": "游泳🏊/水上运动",
+				"name": "游泳/水上运动🏊",
+				"is_matchable": true
+			},
+			{
+				"id": "fitness",
+				"name": "塑形健身💪",
 				"is_matchable": true
 			}
 		]
 	},
 	{
-		"id": "desktop",
-		"name": "在桌面上的活动",
+		"id": "intellectual",
+		"name": "「思想碰撞」",
 		"is_matchable": false,
 		"children": [
 			{
-				"id": "board_games",
-				"name": "桌游🐺/牌类🃏/棋类♟",
+				"id": "tech_geek",
+				"name": "技术宅Geek💻",
+				"desc": "对编程、数码产品、硬核科技有浓厚兴趣",
 				"is_matchable": true
 			},
 			{
-				"id": "competitive_games",
-				"name": "竞技向电子游戏🎮",
-				"is_matchable": true,
-				"children": [
-					{
-						"id": "pc_fps",
-						"name": "PC端FPS",
-						"desc": "Apex/PUBG/Valorant等",
-						"is_matchable": true
-					},
-					{
-						"id": "moba",
-						"name": "MOBA类游戏",
-						"desc": "Dota2/LOL/王者等",
-						"is_matchable": true
-					},
-					{
-						"id": "mobile",
-						"name": "除MOBA外的各类手游",
-						"is_matchable": true
-					}
-				]
-			},
-			{
-				"id": "mind_challenging_games",
-				"name": "偏好智力挑战的电子游戏🎮",
-				"desc": "需要开动脑筋，解决谜题或完成挑战的游戏",
-				"is_matchable": true,
-				"children": [
-					{
-						"id": "strategy_games",
-						"name": "战略类游戏",
-						"desc": "回合制(如文明)/即时制(如星际争霸)",
-						"is_matchable": true
-					},
-					{
-						"id": "simulation_games",
-						"name": "模拟经营类游戏",
-						"desc": "缺氧/天际线等",
-						"is_matchable": true
-					},
-					{
-						"id": "sandbox_games",
-						"name": "纯沙盒类/模拟器游戏",
-						"desc": "图灵完备/Roblox/模拟飞行等",
-						"is_matchable": true
-					}
-				]
-			},
-			{
-				"id": "music_games",
-				"name": "音游和强技术性玩法的游戏",
-				"desc": "强技术性玩法：速通等“与自己竞技”的玩法",
+				"id": "literary_creation",
+				"name": "文学创作党🖊",
+				"desc": "小说、诗歌、随笔、同人文……用文字构建世界和疗愈自身",
 				"is_matchable": true
 			},
-			{
-				"id": "story_rich_games",
-				"name": "偏好剧情/氛围的电子游戏🎮",
-				"desc": "更注重游戏沉浸性和故事情节的游戏",
-				"is_matchable": true,
-				"children": [
-					{
-						"id": "narrative_adventure",
-						"name": "RPG/动作冒险游戏",
-						"desc": "巫师/艾尔登法环/2077等大作",
-						"is_matchable": true
-					},
-					{
-						"id": "puzzle_games",
-						"name": "沉浸式解谜/精品独立/创意游戏",
-						"desc": "玩法、美术或叙事独具匠心，能带来独特情感体验，如小小梦魇/Undertale/星际拓荒/Celeste",
-						"is_matchable": true
-					}
-				]
-			},
-			{
-				"id": "coop_party",
-				"name": "合作/派对游戏",
-				"desc": "适合与朋友同屏或联机并主打欢乐互动的游戏，如双人成行、胡闹厨房、马力欧派对、糖豆人",
-				"is_matchable": true
-			}
-		]
-	},
-	{
-		"id": "leisure",
-		"name": "休闲活动",
-		"is_matchable": false,
-		"children": [
-			{
-				"id": "singing",
-				"name": "唱歌🎤",
-				"is_matchable": false,
-				"children": [
-					{
-						"id": "eu_us",
-						"name": "欧美歌曲",
-						"is_matchable": true
-					},
-					{
-						"id": "japan_korea",
-						"name": "日韩歌曲",
-						"is_matchable": true
-					},
-					{
-						"id": "china",
-						"name": "华语歌曲",
-						"is_matchable": true
-					}
-				]
-			},
-			{
-				"id": "instruments",
-				"name": "乐器🎸🎹🎻🥁",
-				"desc": "各种乐器都可以捏，互相交流",
-				"is_matchable": true
-			},
-			{
-				"id": "arts",
-				"name": "独立创作类活动(绘画🖊/摄影📸/写作)",
-				"is_matchable": true
-			},
-			{
-				"id": "crafts",
-				"name": "手工DIY🧵/烘焙/烹饪🍳",
-				"is_matchable": true
-			}
-		]
-	},
-	{
-		"id": "knowledge",
-		"name": "知识型活动",
-		"is_matchable": false,
-		"children": [
 			{
 				"id": "language_exchange",
-				"name": "语言交换🗣",
-				"desc": "喜欢二外的友友快来",
+				"name": "语言交换搭子🌐",
+				"desc": "热衷于学习外语，并希望与人练习",
 				"is_matchable": true,
 				"children": [
 					{
@@ -254,21 +301,9 @@
 				]
 			},
 			{
-				"id": "study_together",
-				"name": "双人自习📚",
-				"desc": "简单地一起学习，互相监督",
-				"is_matchable": true
-			},
-			{
-				"id": "humanities_reading",
-				"name": "人文社科/读书分享🧠",
-				"desc": "读书会、电影鉴赏、历史哲学思辨、社会议题讨论等",
-				"is_matchable": true
-			},
-			{
-				"id": "tech_exchange",
-				"name": "泛计算机技术领域活动💻",
-				"desc": "编程开发、算法研究等",
+				"id": "deep_thinker",
+				"name": "沉思型常驻辩手🤔",
+				"desc": "喜欢讨论社会议题、哲学、心理学等深度话题",
 				"is_matchable": true
 			}
 		]

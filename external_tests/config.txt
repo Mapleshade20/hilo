@@ -11,15 +11,3 @@ badminton: |
 
 # Desktop tags
 pc_fps: 1, 3 | 2
-moba: 4 |
-music_games: 7, 10 | 5
-puzzle_games: 6, 8 |
-
-# Leisure tags
-instruments: |
-
-# Knowledge activities
-spanish: 1 | 2
-japanese: 1 |
-french: |
-study_together: 2, 5, 9 | 4

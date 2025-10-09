@@ -69,7 +69,7 @@ Veto means rejection.
    - A final match will be automatically executed at each scheduled timestamp. Users can use API to get the next timestamp.
    - Only users with `form_completed` status are included, after this their status becomes updated to `matched` (unless unmatched)
    - Vetoes are considered to exclude incompatible pairs
-   - Algorithm: **Greedy**
+   - Algorithm: **Kuhn Munkres** (maximum weight)
 
 2. **Match Results**: Users receive their final match information and decide if their accept it:
    - Displayed info: `familiar_tags`, `aspirational_tags`, `recent_topics`, `self_intro`, `email_domain`, `grade`, profile photo (if any)
