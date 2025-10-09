@@ -1,8 +1,7 @@
 mod common;
 
 use common::{get_access_token, spawn_app};
-use hilo::handlers::ProfileResponse;
-use hilo::models::UserStatus;
+use hilo::{handlers::ProfileResponse, models::UserStatus};
 use sqlx::PgPool;
 
 #[sqlx::test]

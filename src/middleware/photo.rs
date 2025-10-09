@@ -14,8 +14,7 @@ use axum::{
 use tracing::{debug, instrument, trace, warn};
 use uuid::Uuid;
 
-use crate::middleware::AuthUser;
-use crate::models::AppState;
+use crate::{middleware::AuthUser, models::AppState};
 
 /// Partner validation middleware for image access
 ///

@@ -3,8 +3,9 @@
 //! A module for managing hierarchical tags with parent-child relationships,
 //! matchability checks, and ancestor retrieval.
 
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TagNode {

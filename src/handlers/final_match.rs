@@ -12,11 +12,13 @@ use axum::{
 };
 use tracing::{error, info, instrument, warn};
 
-use crate::error::{AppError, AppResult};
-use crate::handlers::get_profile;
-use crate::middleware::AuthUser;
-use crate::models::{AppState, NextMatchTimeResponse, UserStatus};
-use crate::services::scheduler::SchedulerService;
+use crate::{
+    error::{AppError, AppResult},
+    handlers::get_profile,
+    middleware::AuthUser,
+    models::{AppState, NextMatchTimeResponse, UserStatus},
+    services::scheduler::SchedulerService,
+};
 
 /// Accepts a final match result for the authenticated user.
 ///

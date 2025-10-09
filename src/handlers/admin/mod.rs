@@ -38,19 +38,21 @@ use sqlx::PgPool;
 use tracing::warn;
 use uuid::Uuid;
 
+use self::{
+    action::{
+        cancel_scheduled_match, create_scheduled_matches, delete_final_match,
+        get_scheduled_matches, trigger_final_matching, update_match_previews, verify_user,
+    },
+    view::{
+        get_final_matches, get_tags_with_stats, get_user_detail, get_user_stats,
+        get_users_overview, serve_user_card_photo,
+    },
+};
 use crate::{
     error::{AppError, AppResult},
     handlers::admin::view::serve_user_profile_photo,
     models::{TagNode, UserStatus},
     utils::constant::IDF_MIN,
-};
-use action::{
-    cancel_scheduled_match, create_scheduled_matches, delete_final_match, get_scheduled_matches,
-    trigger_final_matching, update_match_previews, verify_user,
-};
-use view::{
-    get_final_matches, get_tags_with_stats, get_user_detail, get_user_stats, get_users_overview,
-    serve_user_card_photo,
 };
 
 pub struct AdminState {

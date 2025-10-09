@@ -10,9 +10,7 @@
 //!
 //! The email endpoint includes rate limiting and input validation for security.
 
-use std::borrow::Cow;
-use std::sync::Arc;
-use std::time::Instant;
+use std::{borrow::Cow, sync::Arc, time::Instant};
 
 use axum::{
     extract::{Json, State},
@@ -24,9 +22,11 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, instrument, trace, warn};
 use validator::Validate;
 
-use crate::error::{AppError, AppResult};
-use crate::models::AppState;
-use crate::utils::{constant::*, static_object::EMAIL_REGEX};
+use crate::{
+    error::{AppError, AppResult},
+    models::AppState,
+    utils::{constant::*, static_object::EMAIL_REGEX},
+};
 
 /// Request payload for sending verification code to email
 #[derive(Debug, Deserialize, Validate)]

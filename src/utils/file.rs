@@ -4,10 +4,10 @@
 //! and file management. These utilities are shared between different upload handlers to
 //! ensure consistent validation and file handling.
 
-use image::ImageFormat;
 use std::path::Path;
-use tokio::fs;
-use tokio::io::AsyncWriteExt;
+
+use image::ImageFormat;
+use tokio::{fs, io::AsyncWriteExt};
 use tracing::{debug, trace};
 
 /// Provides image validation utilities for upload handlers.

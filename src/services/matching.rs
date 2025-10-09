@@ -4,13 +4,15 @@ use sqlx::PgPool;
 use tracing::{debug, instrument, trace};
 use uuid::Uuid;
 
-use crate::error::AppResult;
-use crate::models::{Form, Gender, TagSystem};
-use crate::utils::{
-    constant::{IDF_MIN, MATCH_PREVIEW_INTERVAL},
-    static_object::{
-        BOUNDARY_MATCH_POINTS, COMPLEMENTARY_TAG_WEIGHT, MAX_PREVIEW_CANDIDATES,
-        TAG_SCORE_DECAY_FACTOR, TRAIT_MATCH_POINTS,
+use crate::{
+    error::AppResult,
+    models::{Form, Gender, TagSystem},
+    utils::{
+        constant::{IDF_MIN, MATCH_PREVIEW_INTERVAL},
+        static_object::{
+            BOUNDARY_MATCH_POINTS, COMPLEMENTARY_TAG_WEIGHT, MAX_PREVIEW_CANDIDATES,
+            TAG_SCORE_DECAY_FACTOR, TRAIT_MATCH_POINTS,
+        },
     },
 };
 

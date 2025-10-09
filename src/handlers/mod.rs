@@ -27,16 +27,15 @@ mod veto;
 
 pub use admin::admin_router;
 pub use auth::*;
+use axum::http::StatusCode;
 pub use final_match::*;
 pub use form::*;
 pub use partner_image::*;
 pub use profile::*;
+use tracing::{instrument, trace};
 pub use upload_card::*;
 pub use upload_profile_photo::*;
 pub use veto::*;
-
-use axum::http::StatusCode;
-use tracing::{instrument, trace};
 
 /// Health check endpoint that returns 200 OK.
 ///

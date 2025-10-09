@@ -1,12 +1,13 @@
-use std::sync::Arc;
-use std::time::Instant;
+use std::{sync::Arc, time::Instant};
 
 use dashmap::DashMap;
 use sqlx::PgPool;
 use tracing::{debug, info, instrument};
 
-use crate::services::{email::EmailService, jwt::JwtService};
-use crate::utils::constant::*;
+use crate::{
+    services::{email::EmailService, jwt::JwtService},
+    utils::constant::*,
+};
 
 /// Application state shared across requests. Needs to be thread-safe.
 pub struct AppState {

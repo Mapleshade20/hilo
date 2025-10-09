@@ -14,8 +14,7 @@ pub mod models;
 pub mod services;
 pub mod utils;
 
-use std::env;
-use std::sync::Arc;
+use std::{env, sync::Arc};
 
 use axum::{
     Router,
@@ -26,18 +25,22 @@ use jsonwebtoken::{DecodingKey, EncodingKey};
 use sqlx::PgPool;
 use tracing::info;
 
-use crate::handlers::{
-    accept_final_match, add_veto, get_form, get_next_match_time, get_previews, get_profile,
-    get_vetoes, health_check, refresh_token, reject_final_match, remove_veto,
-    send_verification_code, serve_partner_image, submit_form, upload_card, upload_profile_photo,
-    verify_code,
+use crate::{
+    handlers::{
+        accept_final_match, add_veto, get_form, get_next_match_time, get_previews, get_profile,
+        get_vetoes, health_check, refresh_token, reject_final_match, remove_veto,
+        send_verification_code, serve_partner_image, submit_form, upload_card,
+        upload_profile_photo, verify_code,
+    },
+    models::AppState,
+    services::{
+        email::{EmailService, ExternalEmailer, LogEmailer},
+        jwt::JwtService,
+        matching::MatchingService,
+        scheduler::SchedulerService,
+    },
+    utils::{constant::*, secret, static_object::TAG_SYSTEM},
 };
-use crate::models::AppState;
-use crate::services::email::{EmailService, ExternalEmailer, LogEmailer};
-use crate::services::jwt::JwtService;
-use crate::services::matching::MatchingService;
-use crate::services::scheduler::SchedulerService;
-use crate::utils::{constant::*, secret, static_object::TAG_SYSTEM};
 
 /// Creates an Axum router with default email service configuration.
 ///

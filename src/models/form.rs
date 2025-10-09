@@ -4,11 +4,13 @@ use serde::{Deserialize, Serialize};
 use tracing::warn;
 use uuid::Uuid;
 
-use crate::handlers::FormRequest;
-use crate::models::TagSystem;
-use crate::utils::{
-    constant::*,
-    static_object::{TAGS_LIMIT_SUM, TRAITS, TRAITS_LIMIT_EACH},
+use crate::{
+    handlers::FormRequest,
+    models::TagSystem,
+    utils::{
+        constant::*,
+        static_object::{TAGS_LIMIT_SUM, TRAITS, TRAITS_LIMIT_EACH},
+    },
 };
 
 #[derive(Debug, Serialize, Deserialize, sqlx::Type, PartialEq, Eq, Clone, Copy)]

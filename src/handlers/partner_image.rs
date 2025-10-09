@@ -3,8 +3,7 @@
 //! This module provides protected image serving for partner profile photos.
 //! Only users who are matched partners can access each other's images.
 
-use std::path::Path;
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 
 use axum::{
     body::Body,
@@ -16,9 +15,11 @@ use tower_http::services::ServeFile;
 use tracing::{debug, error, instrument, warn};
 use uuid::Uuid;
 
-use crate::error::{AppError, AppResult};
-use crate::models::AppState;
-use crate::utils::static_object::UPLOAD_DIR;
+use crate::{
+    error::{AppError, AppResult},
+    models::AppState,
+    utils::static_object::UPLOAD_DIR,
+};
 
 /// Serves partner's profile photo for matched users.
 ///

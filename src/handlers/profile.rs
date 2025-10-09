@@ -14,9 +14,11 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, instrument, trace};
 
-use crate::error::{AppError, AppResult};
-use crate::middleware::AuthUser;
-use crate::models::{AppState, FinalPartnerProfile, UserStatus};
+use crate::{
+    error::{AppError, AppResult},
+    middleware::AuthUser,
+    models::{AppState, FinalPartnerProfile, UserStatus},
+};
 
 /// Response containing user profile information
 #[derive(Debug, Serialize, Deserialize)]

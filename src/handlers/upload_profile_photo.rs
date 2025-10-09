@@ -13,8 +13,7 @@
 //! Files are stored in `UPLOAD_DIR/profile_photos/{user_uuid}.{ext}`
 //! The file path is returned in the JSON response but NOT stored in the database.
 
-use std::path::Path;
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 
 use axum::{
     Json,
@@ -25,11 +24,15 @@ use axum::{
 use serde::Serialize;
 use tracing::{debug, error, info, instrument, trace, warn};
 
-use crate::error::{AppError, AppResult};
-use crate::middleware::AuthUser;
-use crate::models::{AppState, UserStatus};
-use crate::utils::file::{FileManager, ImageUploadValidator};
-use crate::utils::static_object::UPLOAD_DIR;
+use crate::{
+    error::{AppError, AppResult},
+    middleware::AuthUser,
+    models::{AppState, UserStatus},
+    utils::{
+        file::{FileManager, ImageUploadValidator},
+        static_object::UPLOAD_DIR,
+    },
+};
 
 /// Response structure for successful profile photo upload.
 #[derive(Serialize)]

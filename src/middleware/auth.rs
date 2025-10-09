@@ -14,8 +14,7 @@ use axum::{
 use tracing::{debug, error, instrument, trace, warn};
 use uuid::Uuid;
 
-use crate::models::AppState;
-use crate::services::jwt::Claims;
+use crate::{models::AppState, services::jwt::Claims};
 
 /// Authentication middleware for protecting routes
 ///

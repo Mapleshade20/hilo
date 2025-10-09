@@ -8,8 +8,7 @@
 //! 3. Files are stored in the filesystem with secure naming
 //! 4. Database is updated with the file path for admin review
 
-use std::path::Path;
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 
 use axum::{
     Json,
@@ -20,11 +19,15 @@ use axum::{
 use serde::Serialize;
 use tracing::{debug, error, info, instrument, trace, warn};
 
-use crate::error::{AppError, AppResult};
-use crate::middleware::AuthUser;
-use crate::models::{AppState, UserStatus};
-use crate::utils::file::{FileManager, ImageUploadValidator};
-use crate::utils::static_object::{ALLOWED_GRADES, UPLOAD_DIR};
+use crate::{
+    error::{AppError, AppResult},
+    middleware::AuthUser,
+    models::{AppState, UserStatus},
+    utils::{
+        file::{FileManager, ImageUploadValidator},
+        static_object::{ALLOWED_GRADES, UPLOAD_DIR},
+    },
+};
 
 /// Response structure for successful card upload
 #[derive(Serialize)]

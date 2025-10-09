@@ -3,8 +3,10 @@
 use std::sync::{Arc, Mutex, Once};
 
 use async_trait::async_trait;
-use hilo::handlers::AuthResponse;
-use hilo::services::email::{EmailError, EmailService};
+use hilo::{
+    handlers::AuthResponse,
+    services::email::{EmailError, EmailService},
+};
 use reqwest::multipart;
 use serde_json::{Value, json};
 use sqlx::PgPool;

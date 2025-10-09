@@ -28,9 +28,11 @@ use sqlx::PgPool;
 use tracing::{debug, error, info, instrument, trace, warn};
 use uuid::Uuid;
 
-use crate::error::{AppError, AppResult};
-use crate::middleware::AuthUser;
-use crate::models::{AppState, ProfilePreview, Veto, VetoRequest};
+use crate::{
+    error::{AppError, AppResult},
+    middleware::AuthUser,
+    models::{AppState, ProfilePreview, Veto, VetoRequest},
+};
 
 /// Gets match previews for the authenticated user.
 ///

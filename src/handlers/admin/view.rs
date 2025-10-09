@@ -15,29 +15,28 @@
 //! List endpoints support pagination with configurable page size (1-100 items)
 //! and include pagination metadata in responses.
 
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 
-use axum::http::Request;
-use axum::response::Response;
 use axum::{
     Json,
     body::Body,
     extract::{Path as AxumPath, Query, State},
-    http::StatusCode,
-    response::IntoResponse,
+    http::{Request, StatusCode},
+    response::{IntoResponse, Response},
 };
 use serde::{Deserialize, Serialize};
-use std::path::Path;
 use time::OffsetDateTime;
 use tower_http::services::ServeFile;
 use tracing::{debug, error, instrument};
 use uuid::Uuid;
 
 use super::{AdminState, convert_tags_to_stats};
-use crate::error::{AppError, AppResult};
-use crate::models::{Form, Gender, UserStatus};
-use crate::services::matching::MatchingService;
-use crate::utils::static_object::{TAG_SYSTEM, TAG_TREE, UPLOAD_DIR};
+use crate::{
+    error::{AppError, AppResult},
+    models::{Form, Gender, UserStatus},
+    services::matching::MatchingService,
+    utils::static_object::{TAG_SYSTEM, TAG_TREE, UPLOAD_DIR},
+};
 
 /// Pagination query parameters
 #[derive(Debug, Deserialize)]

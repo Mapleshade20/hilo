@@ -28,10 +28,12 @@ use tracing::{error, info, instrument, warn};
 use uuid::Uuid;
 
 use super::{AdminState, get_user_id_by_email, get_user_status};
-use crate::error::{AppError, AppResult};
-use crate::models::{CreateScheduledMatchesRequest, UserStatus};
-use crate::services::{matching::MatchingService, scheduler::SchedulerService};
-use crate::utils::static_object::TAG_SYSTEM;
+use crate::{
+    error::{AppError, AppResult},
+    models::{CreateScheduledMatchesRequest, UserStatus},
+    services::{matching::MatchingService, scheduler::SchedulerService},
+    utils::static_object::TAG_SYSTEM,
+};
 
 #[derive(Debug, Serialize)]
 pub struct TriggerMatchingResponse {

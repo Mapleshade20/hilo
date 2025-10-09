@@ -3,10 +3,12 @@
 //! NOTE: Only this test uses `tests/data/tags.test.json` to load a simplified tag system.
 //! Other tests use the full tag system from `tags.json` to ensure comprehensive coverage.
 
-use hilo::models::{Form, Gender, TagSystem};
-use hilo::services::matching::MatchingService;
-use std::collections::HashMap;
-use std::sync::LazyLock;
+use std::{collections::HashMap, sync::LazyLock};
+
+use hilo::{
+    models::{Form, Gender, TagSystem},
+    services::matching::MatchingService,
+};
 use uuid::Uuid;
 
 static TAG_SYSTEM: LazyLock<TagSystem> = LazyLock::new(|| {

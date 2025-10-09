@@ -8,8 +8,7 @@
 //! - `LOG_FORMAT` - Log format, either `json` or `plain` (optional, defaults to `plain`)
 //! - `NO_COLOR` - If set, disables colored log output (optional)
 
-use std::env;
-use std::sync::LazyLock;
+use std::{env, sync::LazyLock};
 
 use hilo::{
     app,
@@ -17,12 +16,10 @@ use hilo::{
     utils::static_object::{EMAIL_REGEX, TAG_SYSTEM},
 };
 use sqlx::PgPool;
-use tokio::net::TcpListener;
-use tokio::signal;
+use tokio::{net::TcpListener, signal};
 use tokio_util::sync::CancellationToken;
 use tracing::{info, instrument, warn};
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
 #[instrument]

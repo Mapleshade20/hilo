@@ -3,8 +3,7 @@
 //! This module implements form endpoints that allow verified users to submit
 //! and retrieve their form data including tags, traits, and profile information.
 
-use std::path::Path;
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 
 use axum::{
     Json,
@@ -17,13 +16,15 @@ use tokio::fs;
 use tracing::{debug, info, instrument, trace, warn};
 use uuid::Uuid;
 
-use crate::error::{AppError, AppResult};
-use crate::middleware::AuthUser;
-use crate::models::{AppState, Form, Gender, UserStatus};
-use crate::services::matching::MatchingService;
-use crate::utils::{
-    file,
-    static_object::{TAG_SYSTEM, UPLOAD_DIR},
+use crate::{
+    error::{AppError, AppResult},
+    middleware::AuthUser,
+    models::{AppState, Form, Gender, UserStatus},
+    services::matching::MatchingService,
+    utils::{
+        file,
+        static_object::{TAG_SYSTEM, UPLOAD_DIR},
+    },
 };
 
 #[derive(Debug, Serialize, Deserialize)]

@@ -1,17 +1,18 @@
 use std::collections::HashMap;
 
-use pathfinding::kuhn_munkres::kuhn_munkres;
-use pathfinding::matrix::Matrix;
+use pathfinding::{kuhn_munkres::kuhn_munkres, matrix::Matrix};
 use sqlx::PgPool;
 use time::OffsetDateTime;
 use tracing::{error, info, instrument, trace};
 use uuid::Uuid;
 
 use super::matching::MatchingService;
-use crate::error::{AppError, AppResult};
-use crate::models::{FinalMatch, Gender, ScheduleStatus, ScheduledFinalMatch, TagSystem};
-use crate::utils::constant::{
-    CHECK_AUTO_ACCEPT_INTERVAL, CHECK_SCHEDULED_MATCH_INTERVAL, FINAL_MATCH_AUTO_ACCEPT_TIMEOUT,
+use crate::{
+    error::{AppError, AppResult},
+    models::{FinalMatch, Gender, ScheduleStatus, ScheduledFinalMatch, TagSystem},
+    utils::constant::{
+        CHECK_AUTO_ACCEPT_INTERVAL, CHECK_SCHEDULED_MATCH_INTERVAL, FINAL_MATCH_AUTO_ACCEPT_TIMEOUT,
+    },
 };
 
 pub struct SchedulerService;

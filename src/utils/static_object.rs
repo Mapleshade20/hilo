@@ -1,6 +1,4 @@
-use std::collections::HashSet;
-use std::env;
-use std::sync::LazyLock;
+use std::{collections::HashSet, env, sync::LazyLock};
 
 use regex::Regex;
 use tracing::error;
