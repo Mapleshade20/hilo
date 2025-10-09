@@ -46,6 +46,14 @@ deno run --allow-all main.ts --mode config --config config.txt
 deno run --allow-all main.ts --mode config --users 12 --config config.txt
 ```
 
+### Silent Mode
+
+Run tests without verbose console output (only errors are shown):
+
+```bash
+deno run --allow-all main.ts --users 10 --silent
+```
+
 ### Advanced Examples
 
 ```bash
@@ -54,6 +62,12 @@ deno run --allow-all main.ts --users 10 --males 8 --full
 
 # 20 users with 12 males, 8 females
 deno run --allow-all main.ts --users 20 --males 12
+
+# Silent mode with custom male count
+deno run --allow-all main.ts --users 20 --males 15 --silent
+
+# Full randomization in silent mode
+deno run --allow-all main.ts --users 10 --full --silent
 ```
 
 ## Test Flow

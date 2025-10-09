@@ -1,5 +1,6 @@
 // Email server mock that receives verification emails and extracts codes
 import { VerificationEmail } from "./types.ts";
+import { log } from "./utils.ts";
 
 const PORT = 8092;
 const verificationCodes: Map<string, string> = new Map();
@@ -26,18 +27,18 @@ async function handleEmailRequest(request: Request): Promise<Response> {
       text: formData.get("html") as string,
     };
 
-    console.log(`📧 Received email for: ${emailData.to}`);
+    log(`📧 Received email for: ${emailData.to}`);
 
     if (emailData.text) {
       const code = extractVerificationCode(emailData.text);
 
       if (code) {
         verificationCodes.set(emailData.to, code);
-        console.log(
+        log(
           `🔑 Extracted verification code for ${emailData.to}: ${code}`,
         );
       } else {
-        console.log(
+        log(
           `❌ Could not extract verification code from email to ${emailData.to}`,
         );
       }
@@ -62,7 +63,7 @@ export function startEmailServer(): Promise<Deno.HttpServer> {
     return Promise.resolve(new Response("Not Found", { status: 404 }));
   };
 
-  console.log(`🚀 Starting email server on port ${PORT}...`);
+  log(`🚀 Starting email server on port ${PORT}...`);
   const server = Deno.serve({ port: PORT }, handler);
 
   return Promise.resolve(server);

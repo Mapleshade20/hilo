@@ -7,6 +7,7 @@ import {
   generateWeChatId,
   colors,
   colorPrint,
+  log,
 } from "./utils.ts";
 
 interface Trait {
@@ -104,13 +105,13 @@ export async function submitAllForms(
   configPath?: string,
   fullMode: boolean = false,
 ): Promise<void> {
-  console.log(`\n📝 Generating and submitting forms in ${mode} mode...`);
+  log(`\n📝 Generating and submitting forms in ${mode} mode...`);
 
   let config: TagConfig | undefined;
   if (mode === "config" && configPath) {
     try {
       config = parseConfigFile(configPath);
-      console.log(
+      log(
         `📋 Loaded config with ${Object.keys(config).length} tag mappings`,
       );
     } catch (error) {
@@ -140,21 +141,21 @@ export async function submitAllForms(
       const formData = generateFormData(user, mode, leafTags, config, fullMode, traits);
       await submitForm(user, formData);
 
-      console.log(`✅ User ${user.id} form submitted:`);
-      console.log(
+      log(`✅ User ${user.id} form submitted:`);
+      log(
         `   Familiar: ${formData.familiar_tags.join(", ") || "none"}`,
       );
-      console.log(
+      log(
         `   Aspirational: ${formData.aspirational_tags.join(", ") || "none"}`,
       );
       if (fullMode) {
-        console.log(
+        log(
           `   Self traits: ${formData.self_traits.join(", ") || "none"}`,
         );
-        console.log(
+        log(
           `   Ideal traits: ${formData.ideal_traits.join(", ") || "none"}`,
         );
-        console.log(`   Physical boundary: ${formData.physical_boundary}`);
+        log(`   Physical boundary: ${formData.physical_boundary}`);
       }
 
       return formData;
@@ -186,8 +187,8 @@ export async function loadTags(): Promise<string[]> {
     const tags: TagNode[] = JSON.parse(tagsContent);
     const leafTags = extractLeafTags(tags);
 
-    console.log(`📚 Loaded ${leafTags.length} leaf tags from tags.json`);
-    console.log(
+    log(`📚 Loaded ${leafTags.length} leaf tags from tags.json`);
+    log(
       `Available tags: ${leafTags.slice(0, 10).join(", ")}${leafTags.length > 10 ? "..." : ""}`,
     );
 
@@ -208,7 +209,7 @@ export async function loadTraits(): Promise<string[]> {
     const traits: Trait[] = JSON.parse(traitsContent);
     const traitIds = traits.map(trait => trait.id);
 
-    console.log(`🎭 Loaded ${traitIds.length} traits from traits.json`);
+    log(`🎭 Loaded ${traitIds.length} traits from traits.json`);
 
     return traitIds;
   } catch (error) {

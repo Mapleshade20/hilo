@@ -9,7 +9,9 @@ import {
   printMatchPreview,
   colors,
   colorPrint,
-  sleep
+  sleep,
+  setSilentMode,
+  log
 } from "./utils.ts";
 
 const HILO_API_URL = "http://127.0.0.1:8090";
@@ -17,7 +19,7 @@ const ADMIN_API_URL = "http://127.0.0.1:8091";
 
 // Trigger match preview update via admin API
 async function updateMatchPreviews(): Promise<void> {
-  console.log(`\n🔄 Triggering match preview update...`);
+  log(`\n🔄 Triggering match preview update...`);
 
   const response = await fetch(`${ADMIN_API_URL}/api/admin/update-previews`, {
     method: "POST",
@@ -31,7 +33,7 @@ async function updateMatchPreviews(): Promise<void> {
   }
 
   const result = await response.json();
-  console.log(`✅ Match previews updated: ${result.message}`);
+  log(`✅ Match previews updated: ${result.message}`);
 }
 
 // Get match previews for a user
@@ -70,7 +72,7 @@ async function displayMatchResults(users: User[]): Promise<void> {
         });
       }
 
-      console.log(); // Empty line between users
+      log(""); // Empty line between users
     } catch (error) {
       colorPrint(`  ❌ Error fetching matches: ${error instanceof Error ? error.message : String(error)}`, colors.red);
     }
@@ -78,7 +80,7 @@ async function displayMatchResults(users: User[]): Promise<void> {
 }
 
 // Parse command line arguments
-function parseArgs(): { mode: TestMode; userCount: number; maleCount?: number; configPath?: string; fullMode: boolean } {
+function parseArgs(): { mode: TestMode; userCount: number; maleCount?: number; configPath?: string; fullMode: boolean; silent: boolean } {
   const args = Deno.args;
 
   let mode: TestMode = "random";
@@ -86,6 +88,7 @@ function parseArgs(): { mode: TestMode; userCount: number; maleCount?: number; c
   let maleCount: number | undefined;
   let configPath: string | undefined;
   let fullMode = false;
+  let silent = false;
 
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
@@ -116,29 +119,35 @@ function parseArgs(): { mode: TestMode; userCount: number; maleCount?: number; c
       case "--full":
         fullMode = true;
         break;
+      case "--silent":
+        silent = true;
+        break;
     }
   }
 
-  return { mode, userCount, maleCount, configPath, fullMode };
+  return { mode, userCount, maleCount, configPath, fullMode, silent };
 }
 
 // Main function
 async function main(): Promise<void> {
-  const { mode, userCount, maleCount, configPath, fullMode } = parseArgs();
+  const { mode, userCount, maleCount, configPath, fullMode, silent } = parseArgs();
+
+  // Set silent mode globally
+  setSilentMode(silent);
 
   printHeader("HILO MATCHING SIMULATION");
-  console.log(`📊 Mode: ${mode}`);
-  console.log(`👥 Users: ${userCount}`);
+  log(`📊 Mode: ${mode}`);
+  log(`👥 Users: ${userCount}`);
   if (maleCount !== undefined) {
-    console.log(`👨 Males: ${maleCount}, 👩 Females: ${userCount - maleCount}`);
+    log(`👨 Males: ${maleCount}, 👩 Females: ${userCount - maleCount}`);
   }
   if (configPath) {
-    console.log(`📋 Config: ${configPath}`);
+    log(`📋 Config: ${configPath}`);
   }
   if (fullMode) {
-    console.log(`🎲 Full randomization: enabled`);
+    log(`🎲 Full randomization: enabled`);
   }
-  console.log();
+  log("");
 
   try {
     // Step 1: Start email server
@@ -161,7 +170,7 @@ async function main(): Promise<void> {
     await updateMatchPreviews();
 
     // Give matching algorithm time to complete
-    console.log("⏳ Waiting for matching algorithm to complete...");
+    log("⏳ Waiting for matching algorithm to complete...");
     await sleep(2000);
 
     // Step 6: Display results

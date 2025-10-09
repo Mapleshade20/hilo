@@ -50,10 +50,8 @@ pub struct ActionResponse {
 ///
 /// POST /api/admin/trigger-match
 ///
-/// This endpoint triggers the final matching algorithm which uses a greedy approach
-/// to create optimal pairs from users with completed forms. The algorithm respects
-/// user vetoes, clears all vetoes and match previews after completion, and updates
-/// matched users' status to 'matched'.
+/// This endpoint triggers the final matching algorithm and updates matched users'
+/// status to 'matched'. All vetoes and match previews are cleared after completion.
 ///
 /// # Returns
 ///

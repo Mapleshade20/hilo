@@ -38,10 +38,11 @@ use sqlx::PgPool;
 use tracing::warn;
 use uuid::Uuid;
 
-use crate::models::{TagNode, UserStatus};
 use crate::{
     error::{AppError, AppResult},
     handlers::admin::view::serve_user_profile_photo,
+    models::{TagNode, UserStatus},
+    utils::constant::IDF_MIN,
 };
 use action::{
     cancel_scheduled_match, create_scheduled_matches, delete_final_match, get_scheduled_matches,
@@ -138,7 +139,8 @@ fn convert_tags_to_stats(
         .map(|node| {
             let user_count = tag_frequencies.get(&node.id).copied().unwrap_or(0);
             let idf_score = if node.is_matchable && user_count > 0 {
-                Some((total_user_count as f64 / user_count as f64).ln())
+                let idf = (total_user_count as f64 / user_count as f64).log2();
+                Some(idf.max(IDF_MIN))
             } else {
                 None
             };

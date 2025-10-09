@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        INSERT INTO final_matches (user_a_id, user_b_id, score)\n        VALUES ($1, $2, $3)\n        RETURNING id, user_a_id, user_b_id, score\n        ",
+  "query": "\n            INSERT INTO final_matches (user_a_id, user_b_id, score)\n            VALUES ($1, $2, $3)\n            RETURNING id, user_a_id, user_b_id, score\n            ",
   "describe": {
     "columns": [
       {
@@ -38,5 +38,5 @@
       false
     ]
   },
-  "hash": "688234b93aa7526d27026f0f84903d4412c23f8b981e022bf2f1537edd498723"
+  "hash": "8774e9bc23eda7ff40377bf09cac7116c8fd113574e9915eeb1de8b4161cedf6"
 }

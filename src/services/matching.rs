@@ -7,7 +7,7 @@ use uuid::Uuid;
 use crate::error::AppResult;
 use crate::models::{Form, Gender, TagSystem};
 use crate::utils::{
-    constant::{IDF_MIN, INCOMPATIBLE_MATCH_SCORE, MATCH_PREVIEW_INTERVAL},
+    constant::{IDF_MIN, MATCH_PREVIEW_INTERVAL},
     static_object::{
         BOUNDARY_MATCH_POINTS, COMPLEMENTARY_TAG_WEIGHT, MAX_PREVIEW_CANDIDATES,
         TAG_SCORE_DECAY_FACTOR, TRAIT_MATCH_POINTS,
@@ -15,6 +15,8 @@ use crate::utils::{
 };
 
 pub struct MatchingService;
+
+static INCOMPATIBLE_MATCH_SCORE: f64 = -1.0;
 
 impl MatchingService {
     /// Calculates the compatibility score between two users
@@ -124,11 +126,11 @@ impl MatchingService {
         let direct_matches: HashSet<_> = set_a.intersection(&set_b).collect();
         for tag in &direct_matches {
             score += Self::calculate_idf_score(tag, tag_frequencies, total_user_count);
-            // trace!(
-            //     "Direct tag match: {} (IDF: {})",
-            //     tag,
-            //     Self::calculate_idf_score(tag, tag_frequencies, total_user_count)
-            // );
+            trace!(
+                "Direct tag match: {} (IDF: {})",
+                tag,
+                Self::calculate_idf_score(tag, tag_frequencies, total_user_count)
+            );
         }
 
         // Indirect matches (common ancestors)
@@ -159,14 +161,14 @@ impl MatchingService {
                     );
                     score += ancestor_score * decay_factor;
 
-                    // trace!(
-                    //     "Indirect tag match: {} <-> {} via {} (IDF: {}, decayed: {})",
-                    //     tag_a,
-                    //     tag_b,
-                    //     common_ancestor,
-                    //     ancestor_score,
-                    //     ancestor_score * decay_factor
-                    // );
+                    trace!(
+                        "Indirect tag match: {} <-> {} via {} (IDF: {}, decayed: {})",
+                        tag_a,
+                        tag_b,
+                        common_ancestor,
+                        ancestor_score,
+                        ancestor_score * decay_factor
+                    );
 
                     matched_ancestors.insert(common_ancestor);
                 }
@@ -226,13 +228,6 @@ impl MatchingService {
         let trait_match_points = *TRAIT_MATCH_POINTS;
         let total_matches = (a_satisfied + b_satisfied) as f64;
 
-        // trace!(
-        //     "Trait compatibility: A satisfied: {}, B satisfied: {}, total score: {}",
-        //     a_satisfied,
-        //     b_satisfied,
-        //     total_matches * trait_match_points
-        // );
-
         total_matches * trait_match_points
     }
 
@@ -252,7 +247,7 @@ impl MatchingService {
         let veto_map = Self::build_map_vetoed_as_key(db_pool).await?;
 
         // Calculate tag frequencies for IDF scoring
-        let tag_frequencies = Self::calculate_tag_frequencies(&forms);
+        let tag_frequencies = Self::calculate_tag_frequencies(&forms, tag_system);
         let total_user_count = forms.len() as u32;
 
         // Generate previews for each user
@@ -309,18 +304,34 @@ impl MatchingService {
     }
 
     /// Calculate tag frequencies across all forms for IDF scoring
-    pub(crate) fn calculate_tag_frequencies(forms: &[Form]) -> HashMap<String, u32> {
+    /// Counts both leaf tags and all their ancestors to ensure realistic IDF scores
+    pub(crate) fn calculate_tag_frequencies(
+        forms: &[Form],
+        tag_system: &TagSystem,
+    ) -> HashMap<String, u32> {
         let mut frequencies = HashMap::new();
 
         for form in forms {
-            // Count familiar tags
+            // Count familiar tags and their ancestors
             for tag in &form.familiar_tags {
+                // Count the tag itself
                 *frequencies.entry(tag.clone()).or_insert(0) += 1;
+
+                // Count all ancestors
+                for ancestor in tag_system.get_all_ancestors(tag) {
+                    *frequencies.entry(ancestor).or_insert(0) += 1;
+                }
             }
 
-            // Count aspirational tags
+            // Count aspirational tags and their ancestors
             for tag in &form.aspirational_tags {
+                // Count the tag itself
                 *frequencies.entry(tag.clone()).or_insert(0) += 1;
+
+                // Count all ancestors
+                for ancestor in tag_system.get_all_ancestors(tag) {
+                    *frequencies.entry(ancestor).or_insert(0) += 1;
+                }
             }
         }
 
@@ -337,6 +348,23 @@ impl MatchingService {
             FROM forms f
             JOIN users u ON u.id = f.user_id
             WHERE u.status = 'form_completed'
+            "#,
+        )
+        .fetch_all(db_pool)
+        .await
+    }
+
+    /// Fetch all forms that have been submitted, regardless of user status
+    /// Used for calculating tag frequencies to ensure stable IDF scores
+    pub(crate) async fn fetch_all_submitted_forms(
+        db_pool: &PgPool,
+    ) -> Result<Vec<Form>, sqlx::Error> {
+        sqlx::query_as!(
+            Form,
+            r#"
+            SELECT user_id, gender as "gender: Gender", familiar_tags, aspirational_tags, recent_topics,
+                   self_traits, ideal_traits, physical_boundary, self_intro, profile_photo_filename
+            FROM forms
             "#,
         )
         .fetch_all(db_pool)

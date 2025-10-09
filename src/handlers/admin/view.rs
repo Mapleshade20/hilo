@@ -15,7 +15,6 @@
 //! List endpoints support pagination with configurable page size (1-100 items)
 //! and include pagination metadata in responses.
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::http::Request;
@@ -37,7 +36,8 @@ use uuid::Uuid;
 use super::{AdminState, convert_tags_to_stats};
 use crate::error::{AppError, AppResult};
 use crate::models::{Form, Gender, UserStatus};
-use crate::utils::static_object::{TAG_TREE, UPLOAD_DIR};
+use crate::services::matching::MatchingService;
+use crate::utils::static_object::{TAG_SYSTEM, TAG_TREE, UPLOAD_DIR};
 
 /// Pagination query parameters
 #[derive(Debug, Deserialize)]
@@ -190,6 +190,9 @@ pub async fn serve_user_card_photo(
     req: Request<Body>,
 ) -> Response {
     // Construct the file path for card photos
+    if filename.contains("..") || filename.contains('/') {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
     let file_path = Path::new(UPLOAD_DIR.as_str())
         .join("card_photos")
         .join(&filename);
@@ -383,21 +386,23 @@ pub async fn get_tags_with_stats(
     State(state): State<Arc<AdminState>>,
 ) -> AppResult<impl IntoResponse> {
     // Get all forms to calculate tag statistics
-    let forms = sqlx::query!("SELECT familiar_tags, aspirational_tags FROM forms")
-        .fetch_all(&state.db_pool)
-        .await?;
+    let forms = sqlx::query_as!(
+        Form,
+        r#"
+        SELECT user_id, gender as "gender: Gender", familiar_tags, aspirational_tags,
+               recent_topics, self_traits, ideal_traits, physical_boundary,
+               self_intro, profile_photo_filename
+        FROM forms
+        "#
+    )
+    .fetch_all(&state.db_pool)
+    .await?;
 
     let total_user_count = forms.len() as u32;
 
-    // Calculate tag frequencies for IDF scoring
-    let mut tag_frequencies: HashMap<String, u32> = HashMap::new();
-    for tag in forms.into_iter().flat_map(|rec| {
-        rec.familiar_tags
-            .into_iter()
-            .chain(rec.aspirational_tags.into_iter())
-    }) {
-        *tag_frequencies.entry(tag).or_insert(0) += 1;
-    }
+    // Calculate tag frequencies using the same logic as matching algorithm
+    // This ensures IDF scores shown match actual matching scores
+    let tag_frequencies = MatchingService::calculate_tag_frequencies(&forms, &TAG_SYSTEM);
 
     // Convert tag nodes to stats format
     let tags_with_stats = convert_tags_to_stats(&TAG_TREE, &tag_frequencies, total_user_count);

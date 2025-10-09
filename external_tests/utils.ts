@@ -1,6 +1,14 @@
 // Utility functions for the external test
 import { TagNode, TagConfig } from "./types.ts";
 
+// Global silent mode flag
+let isSilentMode = false;
+
+// Set silent mode
+export function setSilentMode(silent: boolean): void {
+  isSilentMode = silent;
+}
+
 // ANSI color codes for terminal output
 export const colors = {
   reset: "\x1b[0m",
@@ -20,33 +28,48 @@ export const colors = {
 
 // Color printing functions
 export function colorPrint(text: string, color: string): void {
-  console.log(`${color}${text}${colors.reset}`);
+  if (!isSilentMode) {
+    console.log(`${color}${text}${colors.reset}`);
+  }
 }
 
 export function printHeader(text: string): void {
-  console.log(`\n${colors.bright}${colors.cyan}${"=".repeat(60)}${colors.reset}`);
-  console.log(`${colors.bright}${colors.cyan}${text.padStart((60 + text.length) / 2)}${colors.reset}`);
-  console.log(`${colors.bright}${colors.cyan}${"=".repeat(60)}${colors.reset}\n`);
+  if (!isSilentMode) {
+    console.log(`\n${colors.bright}${colors.cyan}${"=".repeat(60)}${colors.reset}`);
+    console.log(`${colors.bright}${colors.cyan}${text.padStart((60 + text.length) / 2)}${colors.reset}`);
+    console.log(`${colors.bright}${colors.cyan}${"=".repeat(60)}${colors.reset}\n`);
+  }
 }
 
 export function printUserInfo(userId: number, email: string, gender: "male" | "female"): void {
-  const genderColor = gender === "male" ? colors.blue : colors.magenta;
-  console.log(`${colors.bright}User ${userId}:${colors.reset} ${genderColor}${gender}${colors.reset} - ${colors.dim}${email}${colors.reset}`);
+  if (!isSilentMode) {
+    const genderColor = gender === "male" ? colors.blue : colors.magenta;
+    console.log(`${colors.bright}User ${userId}:${colors.reset} ${genderColor}${gender}${colors.reset} - ${colors.dim}${email}${colors.reset}`);
+  }
 }
 
 export function printTagInfo(title: string, tags: string[]): void {
-  if (tags.length > 0) {
+  if (!isSilentMode && tags.length > 0) {
     console.log(`  ${colors.yellow}${title}:${colors.reset} ${tags.join(", ")}`);
   }
 }
 
 export function printMatchPreview(preview: any, index: number): void {
-  console.log(`\n${colors.green}  Match Preview ${index + 1}:${colors.reset}`);
-  console.log(`    ${colors.cyan}Domain:${colors.reset} ${preview.email_domain}`);
-  console.log(`    ${colors.cyan}Grade:${colors.reset} ${preview.grade}`);
-  printTagInfo("Familiar Tags", preview.familiar_tags);
-  printTagInfo("Aspirational Tags", preview.aspirational_tags);
-  console.log(`    ${colors.cyan}Recent Topics:${colors.reset} ${colors.dim}${preview.recent_topics}${colors.reset}`);
+  if (!isSilentMode) {
+    console.log(`\n${colors.green}  Match Preview ${index + 1}:${colors.reset}`);
+    console.log(`    ${colors.cyan}Domain:${colors.reset} ${preview.email_domain}`);
+    console.log(`    ${colors.cyan}Grade:${colors.reset} ${preview.grade}`);
+    printTagInfo("Familiar Tags", preview.familiar_tags);
+    printTagInfo("Aspirational Tags", preview.aspirational_tags);
+    console.log(`    ${colors.cyan}Recent Topics:${colors.reset} ${colors.dim}${preview.recent_topics}${colors.reset}`);
+  }
+}
+
+// Silent-aware console.log wrapper
+export function log(message: string): void {
+  if (!isSilentMode) {
+    console.log(message);
+  }
 }
 
 // Create a 1x1 WEBP image

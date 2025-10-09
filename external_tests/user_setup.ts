@@ -1,7 +1,7 @@
 // User setup module for authentication, card upload, and verification
 import { AuthResponse, User } from "./types.ts";
 import { waitForVerificationCode } from "./email_server.ts";
-import { createTestWebpImage, generateTestEmail, colors, colorPrint, sleep } from "./utils.ts";
+import { createTestWebpImage, generateTestEmail, colors, colorPrint, sleep, log } from "./utils.ts";
 
 const HILO_API_URL = "http://127.0.0.1:8090";
 const ADMIN_API_URL = "http://127.0.0.1:8091";
@@ -86,29 +86,29 @@ export async function setupUser(userId: number, gender: "male" | "female"): Prom
 
   try {
     // Step 1: Send verification code
-    console.log(`  📧 Sending verification code...`);
+    log(`  📧 Sending verification code...`);
     await sendVerificationCode(email);
 
     // Step 2: Wait for verification code from email server
-    console.log(`  ⏳ Waiting for verification code...`);
+    log(`  ⏳ Waiting for verification code...`);
     const code = await waitForVerificationCode(email, 10000);
-    console.log(`  🔑 Received verification code: ${code}`);
+    log(`  🔑 Received verification code: ${code}`);
 
     // Step 3: Verify code and get access token
-    console.log(`  🔐 Verifying code...`);
+    log(`  🔐 Verifying code...`);
     const authResponse = await verifyCode(email, code);
-    console.log(`  ✅ Got access token`);
+    log(`  ✅ Got access token`);
 
     // Step 4: Upload card
-    console.log(`  📷 Uploading card (${grade})...`);
+    log(`  📷 Uploading card (${grade})...`);
     await uploadCard(authResponse.access_token, grade);
-    console.log(`  ✅ Card uploaded, status: verification_pending`);
+    log(`  ✅ Card uploaded, status: verification_pending`);
 
     // Step 5: Admin verification
-    console.log(`  👨‍💼 Admin verifying user...`);
+    log(`  👨‍💼 Admin verifying user...`);
     await sleep(500); // Small delay to ensure database consistency
     await verifyUserAsAdmin(email);
-    console.log(`  ✅ User verified by admin`);
+    log(`  ✅ User verified by admin`);
 
     colorPrint(`✅ User ${userId} setup complete!`, colors.green);
 
@@ -126,7 +126,7 @@ export async function setupUser(userId: number, gender: "male" | "female"): Prom
 
 // Setup multiple users concurrently
 export async function setupUsers(userCount: number, maleCount?: number): Promise<User[]> {
-  console.log(`\n🚀 Setting up ${userCount} users...`);
+  log(`\n🚀 Setting up ${userCount} users...`);
 
   // Determine gender for each user
   // If maleCount is specified, first maleCount users are male, rest are female

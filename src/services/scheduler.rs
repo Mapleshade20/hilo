@@ -1,13 +1,15 @@
-use std::collections::HashSet;
+use std::collections::HashMap;
 
+use pathfinding::kuhn_munkres::kuhn_munkres;
+use pathfinding::matrix::Matrix;
 use sqlx::PgPool;
 use time::OffsetDateTime;
-use tracing::{error, info, instrument};
+use tracing::{error, info, instrument, trace};
 use uuid::Uuid;
 
 use super::matching::MatchingService;
 use crate::error::{AppError, AppResult};
-use crate::models::{FinalMatch, ScheduleStatus, ScheduledFinalMatch, TagSystem};
+use crate::models::{FinalMatch, Gender, ScheduleStatus, ScheduledFinalMatch, TagSystem};
 use crate::utils::constant::{
     CHECK_AUTO_ACCEPT_INTERVAL, CHECK_SCHEDULED_MATCH_INTERVAL, FINAL_MATCH_AUTO_ACCEPT_TIMEOUT,
 };
@@ -192,73 +194,145 @@ impl SchedulerService {
         }
     }
 
-    /// Execute the final matching algorithm using greedy approach
+    /// Execute the final matching algorithm using bipartite matching.
+    ///
+    /// Matches males to females using the Kuhn-Munkres algorithm.
+    /// Users from the larger gender group may remain unmatched if sizes are unequal.
     ///
     /// Ok value is the number of matches created
     pub async fn execute_final_matching(
         db_pool: &PgPool,
         tag_system: &TagSystem,
     ) -> AppResult<usize> {
-        // Fetch all users with submitted forms
-        let forms = MatchingService::fetch_unmatched_forms(db_pool).await?;
-        if forms.is_empty() {
+        // Fetch unmatched users for matching
+        let unmatched_forms = MatchingService::fetch_unmatched_forms(db_pool).await?;
+
+        // Fetch ALL submitted forms for stable tag frequency calculation
+        // This ensures IDF scores remain consistent across multiple matching runs
+        let all_forms = MatchingService::fetch_all_submitted_forms(db_pool).await?;
+
+        // Partition unmatched users by gender
+        let mut males = Vec::new();
+        let mut females = Vec::new();
+        for form in &unmatched_forms {
+            match form.gender {
+                Gender::Male => males.push(form),
+                Gender::Female => females.push(form),
+            }
+        }
+
+        // Handle edge cases: need at least one of each gender
+        if males.is_empty() || females.is_empty() {
+            info!(
+                males_count = males.len(),
+                females_count = females.len(),
+                "Cannot perform matching: need at least one user of each gender"
+            );
             return Ok(0);
         }
+
+        // Kuhn-Munkres requires rows <= columns, so use smaller set as rows
+        let (rows, cols, transposed) = if males.len() <= females.len() {
+            (males.as_slice(), females.as_slice(), false)
+        } else {
+            (females.as_slice(), males.as_slice(), true)
+        };
+
+        let rows_count = rows.len();
+        let cols_count = cols.len();
+
+        info!(
+            males_count = males.len(),
+            females_count = females.len(),
+            rows_count,
+            cols_count,
+            transposed,
+            "Starting bipartite matching"
+        );
 
         // Fetch all veto records
         let veto_map = MatchingService::build_map_vetoed_as_key(db_pool).await?;
 
-        // Calculate tag frequencies for IDF scoring
-        let tag_frequencies = MatchingService::calculate_tag_frequencies(&forms);
-        let total_user_count = forms.len() as u32;
+        // Calculate tag frequencies for IDF scoring using ALL forms (not just unmatched)
+        let tag_frequencies = MatchingService::calculate_tag_frequencies(&all_forms, tag_system);
+        let total_user_count = all_forms.len() as u32;
 
-        // Build score matrix for all valid pairs
-        let mut pair_scores = Vec::new();
+        // Build bipartite weight matrix
+        // Requires Ord so we scale f64 scores by 1000 and convert to i64 to preserve precision
+        // Usually scores are between 0.1 and 30.0, so this should be safe
+        const SCALE_FACTOR: f64 = 1000.0;
+        let mut weights = Matrix::new(rows_count, cols_count, 0_i64);
+        let mut raw_scores = HashMap::new();
 
-        for (i, form_a) in forms.iter().enumerate() {
-            for (j, form_b) in forms.iter().enumerate() {
-                if i >= j {
-                    continue; // Only consider each pair once
-                }
-
+        for (i, form_row) in rows.iter().enumerate() {
+            for (j, form_col) in cols.iter().enumerate() {
                 let score = MatchingService::calculate_match_score(
-                    form_a,
-                    form_b,
+                    form_row,
+                    form_col,
                     tag_system,
                     &tag_frequencies,
                     total_user_count,
                 );
 
-                // Apply vetoes - if either user has vetoed the other, set score to -1
-                if MatchingService::is_vetoed(form_a.user_id, form_b.user_id, &veto_map)
-                    || MatchingService::is_vetoed(form_b.user_id, form_a.user_id, &veto_map)
-                {
-                    continue; // Skip vetoed pairs entirely
+                // Validate score is not NaN or infinite
+                if !score.is_finite() {
+                    error!(
+                        user_row = %form_row.user_id,
+                        user_col = %form_col.user_id,
+                        score,
+                        "Invalid score detected (NaN or infinity), skipping pair"
+                    );
+                    continue;
                 }
 
+                // Apply vetoes - if either user has vetoed the other, leave score at 0
+                if MatchingService::is_vetoed(form_row.user_id, form_col.user_id, &veto_map)
+                    || MatchingService::is_vetoed(form_col.user_id, form_row.user_id, &veto_map)
+                {
+                    continue;
+                }
+
+                // Only use positive scores
                 if score > 0.0 {
-                    pair_scores.push((form_a.user_id, form_b.user_id, score));
+                    // Scale and convert to integer for kuhn_munkres
+                    let weight = (score * SCALE_FACTOR) as i64;
+                    weights[(i, j)] = weight;
+
+                    // Store raw score for final match creation
+                    raw_scores.insert((i, j), score);
                 }
             }
         }
 
-        // Sort by score (descending) for greedy algorithm
-        // TODO: consider using better algorithm like Hungarian for optimal matching
-        pair_scores.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
+        // Run Kuhn-Munkres algorithm to find maximum weight bipartite matching
+        // Returns (total_weight, assignments) where assignments[i] = j means row[i] is matched to col[j]
+        let (_, assignments) = kuhn_munkres(&weights);
 
-        // Greedy matching algorithm
-        let mut matched_users = HashSet::new();
+        // Extract valid matches from assignments
         let mut final_matches = Vec::new();
 
-        for (user_a, user_b, score) in pair_scores {
-            if !matched_users.contains(&user_a) && !matched_users.contains(&user_b) {
-                // Create the final match
-                let final_match = Self::create_final_match(db_pool, user_a, user_b, score).await?;
-                final_matches.push(final_match);
-
-                matched_users.insert(user_a);
-                matched_users.insert(user_b);
+        for (i, &j) in assignments.iter().enumerate() {
+            // Skip zero-weight assignments (no compatible match found)
+            if weights[(i, j)] <= 0 {
+                continue;
             }
+
+            let user_row = rows[i].user_id;
+            let user_col = cols[j].user_id;
+
+            // Get the original raw score for this match
+            let score = raw_scores.get(&(i, j)).copied().ok_or_else(|| {
+                error!(
+                    %user_row, %user_col,
+                    "Missing raw score for matched pair, this should not happen"
+                );
+                AppError::Internal
+            })?;
+
+            // Create the final match
+            let final_match = Self::create_final_match(db_pool, user_row, user_col, score).await?;
+            trace!(%final_match.id, %score, "Created final match");
+            final_matches.push(final_match);
         }
 
         // Update status of matched users to 'matched'
@@ -304,10 +378,10 @@ impl SchedulerService {
         sqlx::query_as!(
             FinalMatch,
             r#"
-        INSERT INTO final_matches (user_a_id, user_b_id, score)
-        VALUES ($1, $2, $3)
-        RETURNING id, user_a_id, user_b_id, score
-        "#,
+            INSERT INTO final_matches (user_a_id, user_b_id, score)
+            VALUES ($1, $2, $3)
+            RETURNING id, user_a_id, user_b_id, score
+            "#,
             first_user,
             second_user,
             score
@@ -321,7 +395,7 @@ impl SchedulerService {
     pub async fn auto_accept_expired_matches(db_pool: &PgPool) -> AppResult<()> {
         let cutoff_time = OffsetDateTime::now_utc() - FINAL_MATCH_AUTO_ACCEPT_TIMEOUT;
 
-        // Find final matches older than 24 hours where both users are still in 'matched' status
+        // Find final matches older than 24 hours where at least one user has not confirmed
         let expired_matches = sqlx::query!(
             r#"
             SELECT fm.id, fm.user_a_id, fm.user_b_id
@@ -354,7 +428,7 @@ impl SchedulerService {
             .execute(tx.as_mut())
             .await?;
 
-            // Only commit if both users were still in 'matched' status
+            // Only commit if at lease one user is still in 'matched' status
             if user_a_result.rows_affected() > 0 || user_b_result.rows_affected() > 0 {
                 tx.commit().await?;
                 info!(
