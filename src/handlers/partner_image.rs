@@ -72,7 +72,7 @@ pub async fn serve_partner_image(
         .try_call(req)
         .await
         .inspect(|res| {
-            if res.status().is_success() {
+            if res.status().is_success() || res.status().is_redirection() {
                 debug!("File served successfully");
             } else {
                 warn!("File serving returned status: {}", res.status());

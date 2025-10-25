@@ -39,3 +39,6 @@ pub const FINAL_MATCH_AUTO_ACCEPT_TIMEOUT: Duration = Duration::from_secs(24 * 6
 
 /// Interval to check for final matches that need auto-acceptance
 pub const CHECK_AUTO_ACCEPT_INTERVAL: Duration = Duration::from_secs(10 * 60); // 10 minutes
+
+/// Size (the larger dimension) of profile photo thumbnails in pixels
+pub const THUMBNAIL_SIZE: u32 = 80;

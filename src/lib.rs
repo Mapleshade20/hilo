@@ -29,8 +29,8 @@ use crate::{
     handlers::{
         accept_final_match, add_veto, get_form, get_next_match_time, get_previews, get_profile,
         get_vetoes, health_check, refresh_token, reject_final_match, remove_veto,
-        send_verification_code, serve_partner_image, submit_form, upload_card,
-        upload_profile_photo, verify_code,
+        send_verification_code, serve_partner_image, serve_profile_thumbnail, submit_form,
+        upload_card, upload_profile_photo, verify_code,
     },
     models::AppState,
     services::{
@@ -133,6 +133,10 @@ pub fn app_with_email_service(db_pool: PgPool, email_service: Arc<dyn EmailServi
         .route("/api/final-match/accept", post(accept_final_match))
         .route("/api/final-match/reject", post(reject_final_match))
         .route("/api/final-match/time", get(get_next_match_time))
+        .route(
+            "/api/images/thumbnail/{user_id}",
+            get(serve_profile_thumbnail),
+        )
         .route(
             "/api/images/partner/{filename}",
             get(serve_partner_image).route_layer(from_fn_with_state(
