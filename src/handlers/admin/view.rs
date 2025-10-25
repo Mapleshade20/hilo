@@ -27,7 +27,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use tower_http::services::ServeFile;
-use tracing::{debug, error, instrument};
+use tracing::{debug, error, instrument, warn};
 use uuid::Uuid;
 
 use super::{AdminState, convert_tags_to_stats};
@@ -200,10 +200,10 @@ pub async fn serve_user_card_photo(
     let mut service = ServeFile::new(file_path);
     match service.try_call(req).await {
         Ok(res) => {
-            if res.status() == StatusCode::OK {
+            if res.status().is_success() || res.status().is_redirection() {
                 debug!(%filename, "Card photo served successfully");
             } else {
-                error!(%filename, "Card photo not found");
+                warn!(%filename, "Card photo serving returned status: {}", res.status());
             }
             res.into_response()
         }
@@ -239,10 +239,10 @@ pub async fn serve_user_profile_photo(
     let mut service = ServeFile::new(file_path);
     match service.try_call(req).await {
         Ok(res) => {
-            if res.status() == StatusCode::OK {
+            if res.status().is_success() || res.status().is_redirection() {
                 debug!(%filename, "Profile photo served successfully");
             } else {
-                error!(%filename, "Profile photo not found");
+                warn!(%filename, "Profile photo serving returned status: {}", res.status());
             }
             res.into_response()
         }

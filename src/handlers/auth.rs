@@ -265,7 +265,7 @@ pub async fn refresh_token(
         .refresh_token_pair(&payload.refresh_token)
         .await
         .map_err(|e| {
-            warn!(error = %e, "Token refresh failed");
+            info!(error = %e, "Token refresh failed");
             AppError::Unauthorized("Invalid refresh token")
         })?;
 
