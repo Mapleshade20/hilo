@@ -13,7 +13,10 @@ use std::{env, sync::LazyLock};
 use hilo::{
     app,
     handlers::admin_router,
-    utils::static_object::{EMAIL_REGEX, TAG_SYSTEM},
+    utils::{
+        static_object::{EMAIL_REGEX, TAG_SYSTEM},
+        thumbnail_fixup,
+    },
 };
 use sqlx::PgPool;
 use tokio::{net::TcpListener, signal};
@@ -26,10 +29,10 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 async fn main() {
     dotenvy::dotenv().ok(); // doesn't override existing env vars
 
-    // 1. Set up tracing subscriber for logging
+    // Set up tracing subscriber for logging
     init_tracing();
 
-    // 2. Connect to PostgreSQL database and run migrations
+    // Connect to PostgreSQL database and run migrations
     let db_pool = PgPool::connect(
         &env::var("DATABASE_URL").expect("Env variable `DATABASE_URL` should be set"),
     )
@@ -42,7 +45,12 @@ async fn main() {
 
     info!("Connected to PostgreSQL database");
 
-    // 3. Create a shared cancellation token
+    // Generate missing thumbnails for existing profile photos (background task)
+    tokio::spawn(async {
+        thumbnail_fixup::generate_missing_thumbnails().await;
+    });
+
+    // Create a shared cancellation token
     let shutdown_token = CancellationToken::new();
     let main_shutdown = shutdown_token.child_token();
     let admin_shutdown = shutdown_token.child_token();
@@ -70,7 +78,7 @@ async fn main() {
         }
     };
 
-    // 4. Start main server
+    // Start main server
     LazyLock::force(&EMAIL_REGEX); // ensure panic happens at startup
     LazyLock::force(&TAG_SYSTEM);
     let main_db = db_pool.clone();
@@ -86,7 +94,7 @@ async fn main() {
             .unwrap();
     });
 
-    // 5. Start admin server
+    // Start admin server
     // Admin server is protected by Cloudflare Access, so no additional auth is needed
     let mut admin_server = tokio::spawn(async move {
         let router = admin_router(db_pool);
@@ -100,7 +108,7 @@ async fn main() {
             .unwrap();
     });
 
-    // 6. Wait for either server to complete or shutdown signal
+    // Wait for either server to complete or shutdown signal
     tokio::select! {
         _ = &mut main_server => {
             warn!("Main server terminated unexpectedly");

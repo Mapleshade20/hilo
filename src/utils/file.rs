@@ -6,7 +6,7 @@
 
 use std::path::Path;
 
-use image::ImageFormat;
+use image::{GenericImageView, ImageFormat, imageops::FilterType};
 use tokio::{fs, io::AsyncWriteExt};
 use tracing::{debug, trace};
 
@@ -140,5 +140,98 @@ impl FileManager {
 
         debug!(file_path = %file_path.display(), "File saved successfully");
         Ok(())
+    }
+}
+
+/// Provides image processing utilities for thumbnails and resizing.
+pub struct ImageProcessor;
+
+impl ImageProcessor {
+    /// Creates a thumbnail from image data, maintaining aspect ratio.
+    ///
+    /// The larger dimension (width or height) is resized to the target size,
+    /// and the other dimension is scaled proportionally. If the image is already
+    /// smaller than or equal to the target size in both dimensions, it is returned as-is.
+    ///
+    /// # Arguments
+    ///
+    /// * `image_data` - The original image data
+    /// * `target_size` - The target size for the larger dimension (e.g., 80)
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(Vec<u8>)` - The thumbnail image data in the original format
+    /// * `Err(String)` - Error message if processing fails
+    pub fn create_thumbnail(image_data: &[u8], target_size: u32) -> Result<Vec<u8>, String> {
+        // Load the image
+        let img = image::load_from_memory(image_data)
+            .map_err(|e| format!("Failed to load image: {}", e))?;
+
+        // Determine the original dimensions
+        let (width, height) = img.dimensions();
+        trace!(
+            original_width = width,
+            original_height = height,
+            "Original image dimensions"
+        );
+
+        // If image is already smaller than target size, return as-is
+        if width <= target_size && height <= target_size {
+            debug!(
+                "Image already smaller than target size ({}x{} <= {}), using original",
+                width, height, target_size
+            );
+            return Ok(image_data.to_vec());
+        }
+
+        // Calculate new dimensions maintaining aspect ratio
+        let (new_width, new_height) = if width > height {
+            let ratio = height as f32 / width as f32;
+            (target_size, (target_size as f32 * ratio).round() as u32)
+        } else {
+            let ratio = width as f32 / height as f32;
+            ((target_size as f32 * ratio).round() as u32, target_size)
+        };
+
+        debug!(
+            new_width = new_width,
+            new_height = new_height,
+            "Resizing to thumbnail dimensions"
+        );
+
+        // Resize the image using Lanczos3 filter for high quality
+        let thumbnail = img.resize(new_width, new_height, FilterType::Lanczos3);
+
+        // Detect format from original data
+        let format = image::guess_format(image_data)
+            .map_err(|e| format!("Failed to detect image format: {}", e))?;
+
+        // Encode the thumbnail to bytes
+        let mut buffer = Vec::new();
+        thumbnail
+            .write_to(&mut std::io::Cursor::new(&mut buffer), format)
+            .map_err(|e| format!("Failed to encode thumbnail: {}", e))?;
+
+        trace!(
+            thumbnail_size = buffer.len(),
+            "Thumbnail created successfully"
+        );
+        Ok(buffer)
+    }
+
+    /// Generates a thumbnail filename from the original filename.
+    ///
+    /// # Arguments
+    ///
+    /// * `original_filename` - The original filename (e.g., "uuid.jpg")
+    ///
+    /// # Returns
+    ///
+    /// A thumbnail filename in the format `{stem}_thumb.{extension}`
+    pub fn thumbnail_filename(original_filename: &str) -> String {
+        let path = Path::new(original_filename);
+        let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("file");
+        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("jpg");
+        format!("{}_thumb.{}", stem, ext)
     }
 }

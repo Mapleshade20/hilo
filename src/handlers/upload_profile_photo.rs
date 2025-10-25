@@ -29,7 +29,8 @@ use crate::{
     middleware::AuthUser,
     models::{AppState, UserStatus},
     utils::{
-        file::{FileManager, ImageUploadValidator},
+        constant::THUMBNAIL_SIZE,
+        file::{FileManager, ImageProcessor, ImageUploadValidator},
         static_object::UPLOAD_DIR,
     },
 };
@@ -158,6 +159,28 @@ pub async fn upload_profile_photo(
         file_size = file_data.len(),
         "Profile photo uploaded successfully"
     );
+
+    // Generate and save thumbnail (non-critical - log errors but don't fail)
+    match ImageProcessor::create_thumbnail(&file_data, THUMBNAIL_SIZE) {
+        Ok(thumbnail_data) => {
+            let thumbnail_filename = ImageProcessor::thumbnail_filename(&filename);
+            let thumbnail_path = profile_photos_dir.join(&thumbnail_filename);
+
+            debug!(thumbnail_path = %thumbnail_path.display(), "Saving thumbnail");
+
+            if let Err(e) = FileManager::save_file(&thumbnail_path, &thumbnail_data).await {
+                error!(error = %e, "Failed to save thumbnail, continuing without it");
+            } else {
+                info!(
+                    thumbnail_size = thumbnail_data.len(),
+                    "Thumbnail created successfully"
+                );
+            }
+        }
+        Err(e) => {
+            error!(error = %e, "Failed to create thumbnail, continuing without it");
+        }
+    }
 
     // Return success response with filename and user data
     Ok((
