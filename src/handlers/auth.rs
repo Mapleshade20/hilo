@@ -260,8 +260,6 @@ pub async fn refresh_token(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<RefreshTokenRequest>,
 ) -> AppResult<impl IntoResponse> {
-    debug!("Processing token refresh request");
-
     let token_pair = state
         .jwt_service
         .refresh_token_pair(&payload.refresh_token)
@@ -271,7 +269,7 @@ pub async fn refresh_token(
             AppError::Unauthorized("Invalid refresh token")
         })?;
 
-    info!("Token refresh successful");
+    debug!("Token refresh successful");
     Ok((
         StatusCode::OK,
         Json(AuthResponse {
