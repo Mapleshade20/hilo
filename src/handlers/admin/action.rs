@@ -63,7 +63,7 @@ pub struct ActionResponse {
 pub async fn trigger_final_matching(
     State(state): State<Arc<AdminState>>,
 ) -> AppResult<impl IntoResponse> {
-    let matches_len = SchedulerService::execute_final_matching(&state.db_pool, &TAG_SYSTEM)
+    let matches_len = SchedulerService::execute_final_matching(&state.db_pool, &TAG_SYSTEM, false)
         .await
         .map_err(|e| {
             error!("Final matching failed: {}", e);
@@ -74,6 +74,39 @@ pub async fn trigger_final_matching(
     Ok(Json(TriggerMatchingResponse {
         success: true,
         message: "Final matching completed successfully",
+        matches_created: matches_len,
+    }))
+}
+
+/// Simulates the final matching algorithm without database changes.
+///
+/// POST /api/admin/dry-run-final
+///
+/// This endpoint runs the final matching algorithm in dry run mode, which means:
+/// - No database changes are made (no matches created, no status updates, no deletions)
+/// - Results are saved to a JSON file in UPLOAD_DIR with filename format:
+///   `dry_run_matches_{timestamp}.json`
+/// - Returns the number of matches that would be created
+///
+/// The output file includes user IDs, emails, and compatibility scores for each match.
+///
+/// # Returns
+///
+/// - `200 OK` with `TriggerMatchingResponse` - Dry run completed successfully
+/// - `500 Internal Server Error` - Matching algorithm or file write failure
+#[instrument(skip_all, fields(request_id = %uuid::Uuid::new_v4()))]
+pub async fn dry_run_final(State(state): State<Arc<AdminState>>) -> AppResult<impl IntoResponse> {
+    let matches_len = SchedulerService::execute_final_matching(&state.db_pool, &TAG_SYSTEM, true)
+        .await
+        .map_err(|e| {
+            error!("Final matching dry run failed: {}", e);
+            AppError::Internal
+        })?;
+
+    info!("Final matching dry run completed: {} pairs", matches_len);
+    Ok(Json(TriggerMatchingResponse {
+        success: true,
+        message: "Final matching dry run completed successfully",
         matches_created: matches_len,
     }))
 }

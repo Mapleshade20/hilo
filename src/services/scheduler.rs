@@ -1,19 +1,40 @@
 use std::collections::HashMap;
 
 use pathfinding::{kuhn_munkres::kuhn_munkres, matrix::Matrix};
+use serde::Serialize;
 use sqlx::PgPool;
 use time::OffsetDateTime;
-use tracing::{error, info, instrument, trace};
+use tracing::{debug, error, info, instrument};
 use uuid::Uuid;
 
 use super::matching::MatchingService;
 use crate::{
     error::{AppError, AppResult},
     models::{FinalMatch, Gender, ScheduleStatus, ScheduledFinalMatch, TagSystem},
-    utils::constant::{
-        CHECK_AUTO_ACCEPT_INTERVAL, CHECK_SCHEDULED_MATCH_INTERVAL, FINAL_MATCH_AUTO_ACCEPT_TIMEOUT,
+    utils::{
+        constant::{
+            CHECK_AUTO_ACCEPT_INTERVAL, CHECK_SCHEDULED_MATCH_INTERVAL,
+            FINAL_MATCH_AUTO_ACCEPT_TIMEOUT,
+        },
+        static_object::UPLOAD_DIR,
     },
 };
+
+#[derive(Debug, Serialize)]
+struct DryRunMatch {
+    user_a_id: Uuid,
+    user_a_email: String,
+    user_b_id: Uuid,
+    user_b_email: String,
+    score: f64,
+}
+
+#[derive(Debug, Serialize)]
+struct DryRunOutput {
+    timestamp: String,
+    dry_run: bool,
+    matches: Vec<DryRunMatch>,
+}
 
 pub struct SchedulerService;
 
@@ -158,7 +179,7 @@ impl SchedulerService {
         .await?;
 
         // Execute the final matching algorithm
-        match Self::execute_final_matching(db_pool, tag_system).await {
+        match Self::execute_final_matching(db_pool, tag_system, false).await {
             Ok(matches_created) => {
                 // Update status to completed
                 sqlx::query!(
@@ -200,10 +221,14 @@ impl SchedulerService {
     /// Matches males to females using the Kuhn-Munkres algorithm.
     /// Users from the larger gender group may remain unmatched if sizes are unequal.
     ///
+    /// If `dry_run` is true, simulates matching without database changes and saves
+    /// results to a JSON file in UPLOAD_DIR.
+    ///
     /// Ok value is the number of matches created
     pub async fn execute_final_matching(
         db_pool: &PgPool,
         tag_system: &TagSystem,
+        dry_run: bool,
     ) -> AppResult<usize> {
         // Fetch unmatched users for matching
         let unmatched_forms = MatchingService::fetch_unmatched_forms(db_pool).await?;
@@ -238,7 +263,6 @@ impl SchedulerService {
         } else {
             (females.as_slice(), males.as_slice(), true)
         };
-
         let rows_count = rows.len();
         let cols_count = cols.len();
 
@@ -310,8 +334,7 @@ impl SchedulerService {
         let (_, assignments) = kuhn_munkres(&weights);
 
         // Extract valid matches from assignments
-        let mut final_matches = Vec::new();
-
+        let mut matched_pairs = Vec::new();
         for (i, &j) in assignments.iter().enumerate() {
             // Skip zero-weight assignments (no compatible match found)
             if weights[(i, j)] <= 0 {
@@ -330,37 +353,115 @@ impl SchedulerService {
                 AppError::Internal
             })?;
 
-            // Create the final match
-            let final_match = Self::create_final_match(db_pool, user_row, user_col, score).await?;
-            trace!(%final_match.id, %score, "Created final match");
-            final_matches.push(final_match);
+            matched_pairs.push((user_row, user_col, score));
         }
 
-        // Update status of matched users to 'matched'
-        for final_match in &final_matches {
-            sqlx::query!(
-                r#"UPDATE users SET status = 'matched' WHERE id = $1"#,
-                final_match.user_a_id
-            )
-            .execute(db_pool)
-            .await?;
+        let matches_count = matched_pairs.len();
 
-            sqlx::query!(
-                r#"UPDATE users SET status = 'matched' WHERE id = $1"#,
-                final_match.user_b_id
-            )
-            .execute(db_pool)
-            .await?;
+        if dry_run {
+            // Dry run mode: save results to file without modifying database
+            info!(
+                matches_count,
+                "Dry run mode: saving results to file without database changes"
+            );
+
+            // Fetch user emails for the matched pairs
+            let mut dry_run_matches = Vec::new();
+            for (user_a_id, user_b_id, score) in matched_pairs {
+                let user_a = sqlx::query!(r#"SELECT email FROM users WHERE id = $1"#, user_a_id)
+                    .fetch_one(db_pool)
+                    .await?;
+
+                let user_b = sqlx::query!(r#"SELECT email FROM users WHERE id = $1"#, user_b_id)
+                    .fetch_one(db_pool)
+                    .await?;
+
+                dry_run_matches.push(DryRunMatch {
+                    user_a_id,
+                    user_a_email: user_a.email,
+                    user_b_id,
+                    user_b_email: user_b.email,
+                    score,
+                });
+            }
+
+            // Create output structure
+            let output = DryRunOutput {
+                timestamp: OffsetDateTime::now_utc().to_string(),
+                dry_run: true,
+                matches: dry_run_matches,
+            };
+
+            // Save to file
+            let timestamp = OffsetDateTime::now_utc()
+                .format(&time::format_description::well_known::Rfc3339)
+                .unwrap_or_else(|_| "unknown".to_string())
+                .replace(':', "-"); // Replace colons for filesystem compatibility
+            let filename = format!("dry_run_matches_{}.json", timestamp);
+            let filepath = std::path::Path::new(UPLOAD_DIR.as_str()).join(&filename);
+
+            // Ensure UPLOAD_DIR exists
+            tokio::fs::create_dir_all(UPLOAD_DIR.as_str())
+                .await
+                .map_err(|e| {
+                    error!("Failed to create UPLOAD_DIR: {}", e);
+                    AppError::Internal
+                })?;
+
+            // Write JSON to file
+            let json_content = serde_json::to_string_pretty(&output).map_err(|e| {
+                error!("Failed to serialize dry run output: {}", e);
+                AppError::Internal
+            })?;
+
+            tokio::fs::write(&filepath, json_content)
+                .await
+                .map_err(|e| {
+                    error!("Failed to write dry run file: {}", e);
+                    AppError::Internal
+                })?;
+
+            info!(
+                filepath = %filepath.display(),
+                "Dry run results saved to file"
+            );
+        } else {
+            // Normal mode: persist matches to database
+            let mut final_matches = Vec::new();
+            for (user_row, user_col, score) in matched_pairs {
+                // Create the final match
+                let final_match =
+                    Self::create_final_match(db_pool, user_row, user_col, score).await?;
+                debug!(%final_match.id, %score, "Created a final pair");
+                final_matches.push(final_match);
+            }
+
+            // Update status of matched users to 'matched'
+            for final_match in &final_matches {
+                sqlx::query!(
+                    r#"UPDATE users SET status = 'matched' WHERE id = $1"#,
+                    final_match.user_a_id
+                )
+                .execute(db_pool)
+                .await?;
+
+                sqlx::query!(
+                    r#"UPDATE users SET status = 'matched' WHERE id = $1"#,
+                    final_match.user_b_id
+                )
+                .execute(db_pool)
+                .await?;
+            }
+
+            // Clear all vetoes and previews after final matching
+            info!("Clearing all vetoes and match previews");
+            sqlx::query!("DELETE FROM vetoes").execute(db_pool).await?;
+            sqlx::query!("DELETE FROM match_previews")
+                .execute(db_pool)
+                .await?;
         }
 
-        // Clear all vetoes and previews after final matching
-        info!("Clearing all vetoes and match previews");
-        sqlx::query!("DELETE FROM vetoes").execute(db_pool).await?;
-        sqlx::query!("DELETE FROM match_previews")
-            .execute(db_pool)
-            .await?;
-
-        Ok(final_matches.len())
+        Ok(matches_count)
     }
 
     async fn create_final_match(

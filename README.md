@@ -397,6 +397,11 @@ _Admin endpoints run on separate port (configured via `ADMIN_ADDRESS`)_
   - Response: `{"success": true, "message": "Match previews updated successfully"}`
 - `POST /api/admin/trigger-match` - Manually execute final matching immediately (normally won't be used)
   - Response: `{"success": true, "message": "Final matching completed successfully", "matches_created": 0}`
+- `POST /api/admin/dry-run-final` - Simulate final matching without database changes
+  - Runs the matching algorithm without creating matches or updating user statuses
+  - Saves results to JSON file in UPLOAD_DIR with format `dry_run_matches_{timestamp}.json`
+  - Output file includes user IDs, emails, and compatibility scores for each match pair
+  - Response: `{"success": true, "message": "Final matching dry run completed successfully", "matches_created": 27}`
 - `GET /api/admin/matches?...` - View all final matches
   - Query Parameters: (optional)
     - `page` (default: 1) - Page number

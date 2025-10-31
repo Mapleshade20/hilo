@@ -40,7 +40,7 @@ use uuid::Uuid;
 
 use self::{
     action::{
-        cancel_scheduled_match, create_scheduled_matches, delete_final_match,
+        cancel_scheduled_match, create_scheduled_matches, delete_final_match, dry_run_final,
         get_scheduled_matches, trigger_final_matching, update_match_previews, verify_user,
     },
     view::{
@@ -65,6 +65,7 @@ pub fn admin_router(db_pool: PgPool) -> Router {
 
     Router::new()
         .route("/api/admin/trigger-match", post(trigger_final_matching))
+        .route("/api/admin/dry-run-final", post(dry_run_final))
         .route("/api/admin/update-previews", post(update_match_previews))
         .route("/api/admin/verify-user", post(verify_user))
         .route(
