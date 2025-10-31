@@ -1,0 +1,81 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT u.id, u.email, u.status as \"status: UserStatus\", u.wechat_id\n                FROM users u\n                JOIN forms f ON u.id = f.user_id\n                WHERE u.status = $1 AND f.gender = $2\n                ORDER BY u.created_at DESC\n                LIMIT $3 OFFSET $4\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "email",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "status: UserStatus",
+        "type_info": {
+          "Custom": {
+            "name": "user_status",
+            "kind": {
+              "Enum": [
+                "unverified",
+                "verification_pending",
+                "verified",
+                "form_completed",
+                "matched",
+                "confirmed"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "wechat_id",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        {
+          "Custom": {
+            "name": "user_status",
+            "kind": {
+              "Enum": [
+                "unverified",
+                "verification_pending",
+                "verified",
+                "form_completed",
+                "matched",
+                "confirmed"
+              ]
+            }
+          }
+        },
+        {
+          "Custom": {
+            "name": "gender",
+            "kind": {
+              "Enum": [
+                "male",
+                "female"
+              ]
+            }
+          }
+        },
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "9652a7920f5660a1d2b54eb46098310ea34f5664187306bc019573476f06d756"
+}

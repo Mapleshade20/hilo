@@ -46,6 +46,7 @@ pub struct PaginationQuery {
     #[serde(default = "default_limit")]
     pub limit: u32,
     pub status: Option<UserStatus>,
+    pub gender: Option<Gender>,
 }
 fn default_page() -> u32 {
     1
@@ -81,18 +82,20 @@ pub struct PaginationInfo {
 
 /// Gets a paginated overview of all users in the system.
 ///
-/// GET /api/admin/users ?page=1&limit=20&status=verification_pending
+/// GET /api/admin/users ?page=1&limit=20&status=verification_pending&gender=male
 ///
 /// This endpoint returns a paginated list of users with basic information
 /// (ID, email, status). Results are ordered by creation date (newest first).
 /// Supports pagination with configurable page size (1-100 items per page).
-/// Optionally filters users by status when the status query parameter is provided.
+/// Optionally filters users by status and/or gender. When gender filter is applied,
+/// only users who have submitted forms are included in the results.
 ///
 /// # Query Parameters
 ///
 /// - `page`: Page number (default: 1)
 /// - `limit`: Items per page (default: 20, max: 100)
-/// - `status`: Optional status filter (e.g., "verification_pending")
+/// - `status`: Optional status filter (e.g. "verification_pending")
+/// - `gender`: Optional gender filter ("male" or "female")
 ///
 /// # Returns
 ///
@@ -109,52 +112,122 @@ pub async fn get_users_overview(
     let offset = (page - 1) * limit;
 
     // Get total count
-    let total = if let Some(status) = &pagination.status {
-        sqlx::query_scalar!(
-            "SELECT COUNT(*) FROM users WHERE status = $1",
-            *status as UserStatus
-        )
-        .fetch_one(&state.db_pool)
-        .await?
-        .unwrap_or(0) as u32
-    } else {
-        sqlx::query_scalar!("SELECT COUNT(*) FROM users")
+    let total = match (&pagination.status, &pagination.gender) {
+        (Some(status), Some(gender)) => {
+            // Filter by both status and gender (requires JOIN with forms)
+            sqlx::query_scalar!(
+                "SELECT COUNT(*) FROM users u JOIN forms f ON u.id = f.user_id WHERE u.status = $1 AND f.gender = $2",
+                *status as UserStatus,
+                *gender as Gender
+            )
             .fetch_one(&state.db_pool)
             .await?
             .unwrap_or(0) as u32
+        }
+        (Some(status), None) => {
+            // Filter by status only
+            sqlx::query_scalar!(
+                "SELECT COUNT(*) FROM users WHERE status = $1",
+                *status as UserStatus
+            )
+            .fetch_one(&state.db_pool)
+            .await?
+            .unwrap_or(0) as u32
+        }
+        (None, Some(gender)) => {
+            // Filter by gender only (requires JOIN with forms)
+            sqlx::query_scalar!(
+                "SELECT COUNT(*) FROM users u JOIN forms f ON u.id = f.user_id WHERE f.gender = $1",
+                *gender as Gender
+            )
+            .fetch_one(&state.db_pool)
+            .await?
+            .unwrap_or(0) as u32
+        }
+        (None, None) => {
+            // No filters
+            sqlx::query_scalar!("SELECT COUNT(*) FROM users")
+                .fetch_one(&state.db_pool)
+                .await?
+                .unwrap_or(0) as u32
+        }
     };
 
     // Get users with pagination
-    let users = if let Some(status) = &pagination.status {
-        sqlx::query_as!(
-            UserOverview,
-            r#"
-            SELECT id, email, status as "status: UserStatus", wechat_id
-            FROM users
-            WHERE status = $1
-            ORDER BY created_at DESC
-            LIMIT $2 OFFSET $3
-            "#,
-            *status as UserStatus,
-            limit as i64,
-            offset as i64
-        )
-        .fetch_all(&state.db_pool)
-        .await?
-    } else {
-        sqlx::query_as!(
-            UserOverview,
-            r#"
-            SELECT id, email, status as "status: UserStatus", wechat_id
-            FROM users
-            ORDER BY created_at DESC
-            LIMIT $1 OFFSET $2
-            "#,
-            limit as i64,
-            offset as i64
-        )
-        .fetch_all(&state.db_pool)
-        .await?
+    let users = match (&pagination.status, &pagination.gender) {
+        (Some(status), Some(gender)) => {
+            // Filter by both status and gender (requires JOIN with forms)
+            sqlx::query_as!(
+                UserOverview,
+                r#"
+                SELECT u.id, u.email, u.status as "status: UserStatus", u.wechat_id
+                FROM users u
+                JOIN forms f ON u.id = f.user_id
+                WHERE u.status = $1 AND f.gender = $2
+                ORDER BY u.created_at DESC
+                LIMIT $3 OFFSET $4
+                "#,
+                *status as UserStatus,
+                *gender as Gender,
+                limit as i64,
+                offset as i64
+            )
+            .fetch_all(&state.db_pool)
+            .await?
+        }
+        (Some(status), None) => {
+            // Filter by status only
+            sqlx::query_as!(
+                UserOverview,
+                r#"
+                SELECT id, email, status as "status: UserStatus", wechat_id
+                FROM users
+                WHERE status = $1
+                ORDER BY created_at DESC
+                LIMIT $2 OFFSET $3
+                "#,
+                *status as UserStatus,
+                limit as i64,
+                offset as i64
+            )
+            .fetch_all(&state.db_pool)
+            .await?
+        }
+        (None, Some(gender)) => {
+            // Filter by gender only (requires JOIN with forms)
+            sqlx::query_as!(
+                UserOverview,
+                r#"
+                SELECT u.id, u.email, u.status as "status: UserStatus", u.wechat_id
+                FROM users u
+                JOIN forms f ON u.id = f.user_id
+                WHERE f.gender = $1
+                ORDER BY u.created_at DESC
+                LIMIT $2 OFFSET $3
+                "#,
+                *gender as Gender,
+                limit as i64,
+                offset as i64
+            )
+            .fetch_all(&state.db_pool)
+            .await?
+        }
+        (None, None) => {
+            // No filters
+            sqlx::query_as!(
+                UserOverview,
+                r#"
+                SELECT id, email, status as "status: UserStatus", wechat_id
+                FROM users
+                ORDER BY created_at DESC
+                LIMIT $1 OFFSET $2
+                "#,
+                limit as i64,
+                offset as i64
+            )
+            .fetch_all(&state.db_pool)
+            .await?
+        }
     };
 
     let total_pages = total.div_ceil(limit); // Ceiling division

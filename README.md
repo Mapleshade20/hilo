@@ -284,7 +284,8 @@ _Admin endpoints run on separate port (configured via `ADMIN_ADDRESS`)_
   - Query Params: (optional)
     - `page` (default: 1) - Page number
     - `limit` (default: 20, max: 100) - Items per page
-    - `status` (default: null, accpetable: `unverified`|`verification_pending`|`verified`|`form_completed`|`matched`|`confirmed`) - Filter a specific status
+    - `status` (default: null, accpetable: `unverified`|`verification_pending`|`verified`|`form_completed`|`matched`|`confirmed`) - Filter by status
+    - `gender` (default: null, acceptable: `male`|`female`) - Filter by gender
 
   ```json
   {

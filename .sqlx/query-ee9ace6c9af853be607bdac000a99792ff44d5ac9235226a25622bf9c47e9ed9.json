@@ -1,0 +1,47 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT COUNT(*) FROM users u JOIN forms f ON u.id = f.user_id WHERE u.status = $1 AND f.gender = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        {
+          "Custom": {
+            "name": "user_status",
+            "kind": {
+              "Enum": [
+                "unverified",
+                "verification_pending",
+                "verified",
+                "form_completed",
+                "matched",
+                "confirmed"
+              ]
+            }
+          }
+        },
+        {
+          "Custom": {
+            "name": "gender",
+            "kind": {
+              "Enum": [
+                "male",
+                "female"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "ee9ace6c9af853be607bdac000a99792ff44d5ac9235226a25622bf9c47e9ed9"
+}
